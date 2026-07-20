@@ -49,15 +49,25 @@ door never touches the internet.
 
 ## Install
 
-**HACS (custom repository):** HACS → ⋮ → Custom repositories → add this repo as
-type *Integration* → install → restart HA.
+### 1. Add the integration (HACS — recommended)
 
-**Manual:** copy `custom_components/golmar_quvii/` into your HA `config/` folder
-and restart.
+- **Once it's in the HACS default store:** HACS → search **“Golmar / Quvii
+  Local”** → **Download**.
+- **Until then (custom repository):** HACS → ⋮ (top‑right) → **Custom
+  repositories** → URL `https://github.com/totoantibes/golmar-quvii-ha`,
+  category **Integration** → **Add** → then find it in HACS → **Download**.
 
-Then: **Settings → Devices & Services → Add Integration → “Golmar / Quvii
-Local”**, and enter your account (email or `+phone`) and password. Leave the
-advanced **App ID / OEM ID** fields as‑is for Golmar.
+*Manual alternative:* copy `custom_components/golmar_quvii/` into your HA
+`config/custom_components/` folder.
+
+### 2. Restart Home Assistant
+
+### 3. Configure
+
+**Settings → Devices & Services → Add Integration → “Golmar / Quvii Local”** →
+enter your account (email or `+phone`) and password. Leave the advanced **App ID
+/ OEM ID** fields as‑is for Golmar. Your panels are then discovered
+automatically and appear as devices with open‑door buttons.
 
 ## Entities
 
