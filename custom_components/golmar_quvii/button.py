@@ -1,0 +1,63 @@
+"""Button entities: one per door/lock, press to open."""
+from __future__ import annotations
+
+from homeassistant.components.button import ButtonEntity
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+from .const import DEFAULT_LOCKS, DOMAIN
+
+
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+) -> None:
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    entities: list[GolmarQuviiButton] = []
+    for umid, info in coordinator.data.items():
+        for door, lock, label in DEFAULT_LOCKS:
+            # Create every door/lock enabled; the user disables the ones not wired.
+            entities.append(GolmarQuviiButton(coordinator, umid, info, door, lock, label))
+    async_add_entities(entities)
+
+
+class GolmarQuviiButton(CoordinatorEntity, ButtonEntity):
+    """A single open-door button."""
+
+    _attr_has_entity_name = True
+    _attr_icon = "mdi:gate-open"
+
+    def __init__(self, coordinator, umid, info, door, lock, label) -> None:
+        super().__init__(coordinator)
+        self._umid = umid
+        self._door = door
+        self._lock = lock
+        self._attr_name = label
+        self._attr_unique_id = f"{umid}_d{door}_l{lock}"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, umid)},
+            name=info.get("name") or umid,
+            model=info.get("model"),
+            manufacturer="Golmar / Quvii",
+        )
+
+    @property
+    def available(self) -> bool:
+        return super().available and self._umid in self.coordinator.devices
+
+    async def async_press(self) -> None:
+        device = self.coordinator.devices.get(self._umid)
+        if device is None:
+            raise HomeAssistantError(
+                f"Panel {self._umid} not found on the LAN (no IP discovered yet)"
+            )
+        session = async_get_clientsession(self.hass)
+        ok = await device.async_open(session, self._door, self._lock)
+        if not ok:
+            raise HomeAssistantError(
+                f"Panel rejected open door={self._door} lock={self._lock}"
+            )

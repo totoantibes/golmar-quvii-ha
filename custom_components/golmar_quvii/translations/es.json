@@ -1,0 +1,25 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Cuenta Golmar / Quvii",
+        "description": "Inicia sesión con tu cuenta Golmar G2Call+ (u otra aplicación de portero basada en Quvii). Las credenciales se usan una sola vez para obtener la clave local de cada placa; la apertura de puertas es después 100 % local. Deja App ID / OEM ID tal cual para Golmar.",
+        "data": {
+          "account": "Cuenta (correo o teléfono, ej. +34...)",
+          "password": "Contraseña",
+          "region": "ID de región (1 = Europa)",
+          "app_id": "App ID (avanzado — Golmar = 4053)",
+          "oem_id": "OEM ID (avanzado — Golmar = G0053,A0053)"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Cuenta o contraseña no válidas.",
+      "cannot_connect": "No se pudo conectar con la nube de Quvii.",
+      "no_devices": "Inicio de sesión correcto, pero no se encontraron dispositivos en esta cuenta."
+    },
+    "abort": {
+      "already_configured": "Esta cuenta ya está configurada."
+    }
+  }
+}

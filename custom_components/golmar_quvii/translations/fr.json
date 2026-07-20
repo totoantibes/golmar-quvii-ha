@@ -1,0 +1,25 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Compte Golmar / Quvii",
+        "description": "Connectez-vous avec votre compte Golmar G2Call+ (ou une autre application d'interphone basée sur Quvii). Vos identifiants ne servent qu'une seule fois à récupérer la clé locale de chaque platine ; l'ouverture des portes se fait ensuite 100 % en local. Laissez App ID / OEM ID tels quels pour Golmar.",
+        "data": {
+          "account": "Compte (e-mail ou téléphone, ex. +33...)",
+          "password": "Mot de passe",
+          "region": "Identifiant de région (1 = Europe)",
+          "app_id": "App ID (avancé — Golmar = 4053)",
+          "oem_id": "OEM ID (avancé — Golmar = G0053,A0053)"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Compte ou mot de passe invalide.",
+      "cannot_connect": "Impossible de joindre le cloud Quvii.",
+      "no_devices": "Connexion réussie, mais aucun appareil trouvé sur ce compte."
+    },
+    "abort": {
+      "already_configured": "Ce compte est déjà configuré."
+    }
+  }
+}

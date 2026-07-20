@@ -1,0 +1,25 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Golmar / Quvii account",
+        "description": "Sign in with your Golmar G2Call+ account (or another Quvii-based intercom app). Credentials are used once to fetch each panel's local key; door control afterwards is 100% local. Leave App ID / OEM ID as-is for Golmar.",
+        "data": {
+          "account": "Account (email or phone, e.g. +33...)",
+          "password": "Password",
+          "region": "Region id (1 = Europe)",
+          "app_id": "App ID (advanced — Golmar = 4053)",
+          "oem_id": "OEM ID (advanced — Golmar = G0053,A0053)"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid account or password.",
+      "cannot_connect": "Could not reach the Quvii cloud.",
+      "no_devices": "Login worked but no devices were found on this account."
+    },
+    "abort": {
+      "already_configured": "This account is already configured."
+    }
+  }
+}
