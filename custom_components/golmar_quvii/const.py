@@ -21,10 +21,17 @@ CLIENT_TYPE = "3"
 CGI_USERNAME = "adminapp2"
 CGI_SECURITY = "username"
 
-# Default lock buttons created per device: (door/channel, locknumber, label)
+# Default lock buttons created per device: (door/channel, locknumber, label).
+# "door" is the panel/channel number as reported by get.device.attachInfo:
+# channels 1-4 are the block door panels ("Door N"), channels 9-12 are the
+# general/street panels ("General Panel N"). Each panel exposes two lock relays.
+# A device only actuates the channels physically wired to its bus; the others
+# accept the command but do nothing.
 DEFAULT_LOCKS = [
     (1, 1, "Door 1 Lock 1"),
     (1, 2, "Door 1 Lock 2"),
     (2, 1, "Door 2 Lock 1"),
     (2, 2, "Door 2 Lock 2"),
+    (9, 1, "General Panel 1 Lock 1"),
+    (9, 2, "General Panel 1 Lock 2"),
 ]

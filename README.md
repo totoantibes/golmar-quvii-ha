@@ -71,10 +71,12 @@ automatically and appear as devices with open‑door buttons.
 
 ## Entities
 
-For each panel you get an open‑door **button** per door/lock (`Door 1 Lock 1`,
-`Door 2 Lock 1`, …), grouped under a device. Rename/disable to match your wiring
-(e.g. *Street – Car Entry*), then use them in dashboards, automations and Siri
-Shortcuts like any button.
+For each panel you get an open‑door **button** per door/lock — the block door
+panels (`Door 1 Lock 1`, …) and the general/street panels (`General Panel 1
+Lock 1`, `General Panel 1 Lock 2`, …), grouped under a device. Only the channels
+physically wired to your panel actuate anything; the rest accept the command but
+do nothing, so rename/disable to match your wiring (e.g. *Street – Car Entry*),
+then use them in dashboards, automations and Siri Shortcuts like any button.
 
 ## Other Quvii brands
 
