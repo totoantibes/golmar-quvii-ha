@@ -11,6 +11,13 @@
           "app_id": "App ID (avancé — Golmar = 4053)",
           "oem_id": "OEM ID (avancé — Golmar = G0053,A0053)"
         }
+      },
+      "select": {
+        "title": "Choisissez les portes à commander",
+        "description": "Cochez les platines et gâches que vous utilisez réellement — les mêmes que vous ouvrez depuis l'application Golmar officielle. Les entrées d'immeuble apparaissent comme « Door N » et les entrées de rue comme « General Panel N », chacune avec deux relais de gâche. Seuls les canaux réellement câblés à votre platine ouvrent quelque chose ; les autres sont acceptés par la platine mais n'ont aucun effet. Vous pourrez modifier ce choix plus tard dans les options de l'intégration.",
+        "data": {
+          "locks": "Portes / gâches"
+        }
       }
     },
     "error": {
@@ -20,6 +27,17 @@
     },
     "abort": {
       "already_configured": "Ce compte est déjà configuré."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Portes à commander",
+        "description": "Modifiez les platines et gâches proposées comme boutons — accordez-les à ce que vous ouvrez depuis l'application Golmar officielle. Seuls les canaux câblés à votre platine ouvrent réellement ; décochez les autres.",
+        "data": {
+          "locks": "Portes / gâches"
+        }
+      }
     }
   }
 }

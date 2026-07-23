@@ -8,6 +8,10 @@ CONF_PASSWORD = "password"
 CONF_REGION = "region"
 CONF_APP_ID = "app_id"
 CONF_OEM_ID = "oem_id"
+# entry OPTIONS: the door/lock buttons the user chose to create, as a list of
+# {"umid", "door", "lock", "name"} dicts. Set by the config-flow selection step
+# and editable afterwards via the options flow. Empty/absent -> DEFAULT_LOCKS.
+CONF_LOCKS = "locks"
 
 # Defaults = Golmar G2Call+ (the tested brand). Other Quvii-based brands can
 # override app_id / oem_id / region in the config flow (see README).

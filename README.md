@@ -66,17 +66,24 @@ door never touches the internet.
 
 **Settings → Devices & Services → Add Integration → “Golmar / Quvii Local”** →
 enter your account (email or `+phone`) and password. Leave the advanced **App ID
-/ OEM ID** fields as‑is for Golmar. Your panels are then discovered
-automatically and appear as devices with open‑door buttons.
+/ OEM ID** fields as‑is for Golmar.
+
+The integration then finds your panels on the LAN and shows a **“Choose which
+doors to control”** step listing every panel/lock it detected — block entrances
+as `Door N`, street entrances as `General Panel N`. **Tick the same ones you
+open from the official Golmar app** and finish. Only channels physically wired
+to your panel open anything; the others are accepted by the panel but do
+nothing, so leaving them unticked keeps your buttons clean.
+
+Changed your mind or added a panel later? **Settings → Devices & Services →
+Golmar / Quvii Local → Configure** re-opens the same selection any time.
 
 ## Entities
 
-For each panel you get an open‑door **button** per door/lock — the block door
-panels (`Door 1 Lock 1`, …) and the general/street panels (`General Panel 1
-Lock 1`, `General Panel 1 Lock 2`, …), grouped under a device. Only the channels
-physically wired to your panel actuate anything; the rest accept the command but
-do nothing, so rename/disable to match your wiring (e.g. *Street – Car Entry*),
-then use them in dashboards, automations and Siri Shortcuts like any button.
+Each lock you ticked becomes an open‑door **button** (`Door 1 Lock 1`,
+`General Panel 1 Lock 2`, …), grouped under its panel device. Rename them to
+match your wiring (e.g. *Street – Car Entry*), then use them in dashboards,
+automations and Siri Shortcuts like any button.
 
 ## Other Quvii brands
 

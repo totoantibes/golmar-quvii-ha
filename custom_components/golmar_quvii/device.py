@@ -5,6 +5,7 @@ Uses the per-panel local access key fetched once at setup.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
 import socket
@@ -74,6 +75,43 @@ class QuviiLocalDevice:
             return self._error(await self._post(session, "get.device.status")) is not None
         except (aiohttp.ClientError, asyncio.TimeoutError, OSError):
             return False
+
+    async def async_get_locks(self, session: aiohttp.ClientSession) -> list[dict]:
+        """Enumerate the panel's door/lock relays via get.device.attachInfo.
+
+        Returns one dict per lock relay of each *door* channel (CCTV/light
+        channels are skipped):
+            {"door": <channel id>, "lock": <1-based relay>, "name": str, "enabled": bool}
+        The channel names mirror the official app ("Door1", "General Panel1", ...).
+        Empty list on any error so callers can fall back to a static default.
+        """
+        try:
+            text = await self._post(session, "get.device.attachInfo")
+        except (aiohttp.ClientError, asyncio.TimeoutError, OSError):
+            return []
+        try:
+            devlist = json.loads(text)["body"]["content"]["sub-devlist"]
+        except (ValueError, TypeError, KeyError):
+            return []
+        locks: list[dict] = []
+        for item in devlist:
+            # keep the real door-station channels only (type "chn", camera sub-type);
+            # CCTV inputs and lights carry no openable door.
+            if item.get("type") != "chn" or item.get("sub-type") != "cam":
+                continue
+            door = item.get("id")
+            if door is None:
+                continue
+            name = item.get("name") or f"Channel {door}"
+            relays = len(item.get("children") or []) or 2
+            for lock in range(1, relays + 1):
+                locks.append({
+                    "door": door,
+                    "lock": lock,
+                    "name": f"{name} Lock {lock}",
+                    "enabled": bool(item.get("enable", 1)),
+                })
+        return locks
 
 
 def _local_subnet_prefix() -> str | None:

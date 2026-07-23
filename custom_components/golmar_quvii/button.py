@@ -10,7 +10,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DEFAULT_LOCKS, DOMAIN
+from .const import CONF_LOCKS, DEFAULT_LOCKS, DOMAIN
 
 
 async def async_setup_entry(
@@ -18,10 +18,24 @@ async def async_setup_entry(
 ) -> None:
     coordinator = hass.data[DOMAIN][entry.entry_id]
     entities: list[GolmarQuviiButton] = []
-    for umid, info in coordinator.data.items():
-        for door, lock, label in DEFAULT_LOCKS:
-            # Create every door/lock enabled; the user disables the ones not wired.
-            entities.append(GolmarQuviiButton(coordinator, umid, info, door, lock, label))
+
+    selected = entry.options.get(CONF_LOCKS)
+    if selected is not None:
+        # User picked the panels/locks in the config (or options) flow.
+        # An explicit empty list means "no buttons" and is honoured as-is.
+        for lk in selected:
+            info = coordinator.data.get(lk["umid"])
+            if info is None:
+                continue
+            entities.append(GolmarQuviiButton(
+                coordinator, lk["umid"], info, lk["door"], lk["lock"], lk["name"]))
+    else:
+        # Legacy entry (created before the selection step): fall back to the
+        # static default set for every discovered device.
+        for umid, info in coordinator.data.items():
+            for door, lock, label in DEFAULT_LOCKS:
+                entities.append(GolmarQuviiButton(coordinator, umid, info, door, lock, label))
+
     async_add_entities(entities)
 
 

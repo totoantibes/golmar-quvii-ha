@@ -11,6 +11,13 @@
           "app_id": "App ID (advanced — Golmar = 4053)",
           "oem_id": "OEM ID (advanced — Golmar = G0053,A0053)"
         }
+      },
+      "select": {
+        "title": "Choose which doors to control",
+        "description": "Tick the panels and locks you actually use — the same ones you open from the official Golmar app. Block entrances appear as \"Door N\" and street entrances as \"General Panel N\", each with two lock relays. Only the channels physically wired to your panel open anything; the rest are accepted by the panel but do nothing. You can change this later in the integration's options.",
+        "data": {
+          "locks": "Doors / locks"
+        }
       }
     },
     "error": {
@@ -20,6 +27,17 @@
     },
     "abort": {
       "already_configured": "This account is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Doors to control",
+        "description": "Update which panels and locks appear as buttons — match what you open from the official Golmar app. Only channels wired to your panel actually open; untick the rest.",
+        "data": {
+          "locks": "Doors / locks"
+        }
+      }
     }
   }
 }

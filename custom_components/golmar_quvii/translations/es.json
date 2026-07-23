@@ -11,6 +11,13 @@
           "app_id": "App ID (avanzado — Golmar = 4053)",
           "oem_id": "OEM ID (avanzado — Golmar = G0053,A0053)"
         }
+      },
+      "select": {
+        "title": "Elige qué puertas controlar",
+        "description": "Marca las placas y cerraduras que realmente usas: las mismas que abres desde la aplicación oficial de Golmar. Las entradas de bloque aparecen como «Door N» y las de calle como «General Panel N», cada una con dos relés de cerradura. Solo los canales realmente cableados a tu placa abren algo; el resto los acepta la placa pero no hacen nada. Podrás cambiarlo más tarde en las opciones de la integración.",
+        "data": {
+          "locks": "Puertas / cerraduras"
+        }
       }
     },
     "error": {
@@ -20,6 +27,17 @@
     },
     "abort": {
       "already_configured": "Esta cuenta ya está configurada."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Puertas a controlar",
+        "description": "Actualiza qué placas y cerraduras aparecen como botones: haz que coincidan con lo que abres desde la aplicación oficial de Golmar. Solo los canales cableados a tu placa abren de verdad; desmarca el resto.",
+        "data": {
+          "locks": "Puertas / cerraduras"
+        }
+      }
     }
   }
 }
