@@ -51,11 +51,7 @@ door never touches the internet.
 
 ### 1. Add the integration (HACS — recommended)
 
-- **Once it's in the HACS default store:** HACS → search **“Golmar / Quvii
-  Local”** → **Download**.
-- **Until then (custom repository):** HACS → ⋮ (top‑right) → **Custom
-  repositories** → URL `https://github.com/totoantibes/golmar-quvii-ha`,
-  category **Integration** → **Add** → then find it in HACS → **Download**.
+In HACS, search for **“Golmar / Quvii Local”** and click **Download**.
 
 *Manual alternative:* copy `custom_components/golmar_quvii/` into your HA
 `config/custom_components/` folder.
