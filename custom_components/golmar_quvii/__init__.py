@@ -8,6 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -141,6 +142,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await coordinator.async_config_entry_first_refresh()
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # Setup runs while Home Assistant is still starting, which is exactly when the
+    # sweep is least likely to succeed. If it found nothing, try again the moment
+    # startup finishes instead of waiting out RETRY_INTERVAL - that turns a 15 minute
+    # window of unavailable buttons into a few seconds. If Home Assistant has already
+    # started, async_at_started fires straight away and this is a no-op re-check.
+    if not coordinator.devices:
+        async def _retry_when_started(_hass: HomeAssistant) -> None:
+            _LOGGER.debug("Home Assistant has started; retrying panel discovery")
+            await coordinator.async_request_refresh()
+
+        entry.async_on_unload(async_at_started(hass, _retry_when_started))
+
     # Rebuild the buttons when the user changes the lock selection (options flow).
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     return True

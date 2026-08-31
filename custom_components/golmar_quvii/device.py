@@ -19,9 +19,21 @@ _LOGGER = logging.getLogger(__name__)
 
 # Per-host TCP connect budget for the /24 sweep. A panel on an idle LAN answers in
 # ~20ms, but discovery usually runs while Home Assistant is starting, which is the
-# worst moment on a busy or low-powered host. Too tight a budget here makes the
-# sweep silently find nothing and the buttons go unavailable.
+# worst moment on a busy or low-powered host.
 DISCOVERY_CONNECT_TIMEOUT = 2.0
+
+# Cap on simultaneous probes. The sweep used to open one connection per host - 254 at
+# once - which is what actually broke discovery at startup: on a small host those
+# coroutines starve the event loop and hit their deadline even though the panel is
+# answering in ~20ms. Raising the per-host timeout does not help, because the time is
+# lost waiting for loop time, not for the network.
+#
+# Measured on a Pi 3B+ (2026-08-31): discovery found nothing while Home Assistant was
+# setting up 54 integrations, then succeeded on a later retry with the LAN unchanged -
+# panel 443 open in 19-31ms, /tdkcgi answering HTTP 200 in 0.19s, and only three hosts
+# on the whole /24 with 443 open. Bounding concurrency costs a little wall clock on a
+# sparse subnet and fixes the failure.
+DISCOVERY_CONCURRENCY = 16
 
 # self-signed device cert -> no verification
 _SSL = ssl.create_default_context()
@@ -152,14 +164,17 @@ async def async_discover_ips(devices_by_authcode: dict[str, str]) -> dict[str, s
     if not prefix:
         return {}
     # 1) find hosts with tcp 443 open (fast, concurrent)
+    sem = asyncio.Semaphore(DISCOVERY_CONCURRENCY)
+
     async def _open443(host: str) -> str | None:
-        try:
-            fut = asyncio.open_connection(host, 443)
-            reader, writer = await asyncio.wait_for(fut, timeout=DISCOVERY_CONNECT_TIMEOUT)
-            writer.close()
-            return host
-        except (OSError, asyncio.TimeoutError):
-            return None
+        async with sem:
+            try:
+                fut = asyncio.open_connection(host, 443)
+                reader, writer = await asyncio.wait_for(fut, timeout=DISCOVERY_CONNECT_TIMEOUT)
+                writer.close()
+                return host
+            except (OSError, asyncio.TimeoutError):
+                return None
 
     hosts = [f"{prefix}.{i}" for i in range(1, 255)]
     open_hosts = [h for h in await asyncio.gather(*[_open443(h) for h in hosts]) if h]
