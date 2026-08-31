@@ -17,6 +17,12 @@ from .const import CGI_SECURITY, CGI_USERNAME
 
 _LOGGER = logging.getLogger(__name__)
 
+# Per-host TCP connect budget for the /24 sweep. A panel on an idle LAN answers in
+# ~20ms, but discovery usually runs while Home Assistant is starting, which is the
+# worst moment on a busy or low-powered host. Too tight a budget here makes the
+# sweep silently find nothing and the buttons go unavailable.
+DISCOVERY_CONNECT_TIMEOUT = 2.0
+
 # self-signed device cert -> no verification
 _SSL = ssl.create_default_context()
 _SSL.check_hostname = False
@@ -126,6 +132,16 @@ def _local_subnet_prefix() -> str | None:
         return None
 
 
+async def async_verify_ip(ip: str, umid: str, authcode: str) -> bool:
+    """Confirm a known IP still answers as this panel.
+
+    One request to one host, so this is cheap enough to run on every refresh -
+    unlike async_discover_ips, which sweeps the whole /24.
+    """
+    async with aiohttp.ClientSession() as session:
+        return await QuviiLocalDevice(ip, authcode).async_get_umid(session) == umid
+
+
 async def async_discover_ips(devices_by_authcode: dict[str, str]) -> dict[str, str]:
     """Scan the local /24 for /tdkcgi responders and match umids.
 
@@ -139,7 +155,7 @@ async def async_discover_ips(devices_by_authcode: dict[str, str]) -> dict[str, s
     async def _open443(host: str) -> str | None:
         try:
             fut = asyncio.open_connection(host, 443)
-            reader, writer = await asyncio.wait_for(fut, timeout=0.8)
+            reader, writer = await asyncio.wait_for(fut, timeout=DISCOVERY_CONNECT_TIMEOUT)
             writer.close()
             return host
         except (OSError, asyncio.TimeoutError):
