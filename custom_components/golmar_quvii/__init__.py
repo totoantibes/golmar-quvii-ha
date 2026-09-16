@@ -177,7 +177,7 @@ class GolmarQuviiCoordinator(DataUpdateCoordinator):
             if rescan:
                 try:
                     discovered = await async_discover_ips(rescan, self.extra_hosts)
-                except Exception:  # noqa: BLE001 - discovery is best-effort
+                except Exception:  # discovery is best-effort
                     _LOGGER.exception("Panel discovery failed")
                 else:
                     for umid, endpoint in discovered.items():

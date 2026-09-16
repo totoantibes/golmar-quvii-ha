@@ -28,9 +28,11 @@ jobs:
         with:
           python-version: "3.13"
       - name: Lint
+        # Pinned: ruff enables new rules in minor releases, which would
+        # otherwise fail this job on a commit that changed nothing.
         run: |
-          pip install ruff
-          ruff check custom_components/
+          pip install ruff==0.16.7
+          ruff check custom_components/ tests/
       - name: Unlock routing tests
         # Home Assistant is stubbed, so this needs no install and no hardware.
         run: python tests/test_button_logic.py

@@ -134,8 +134,10 @@ class QuviiCloud:
     @staticmethod
     def _parse_devices(xml: str) -> list[dict]:
         out: list[dict] = []
-        for dev in re.findall(r"<device>(.*?)</device>", xml, re.S):
-            def g(tag: str) -> str | None:
+        for dev in re.findall(r"<device>(.*?)</device>", xml, re.DOTALL):
+            # dev is bound as a default so the closure reads this iteration's
+            # device rather than whichever one the loop ends on
+            def g(tag: str, dev: str = dev) -> str | None:
                 m = re.search(rf"<{tag}>([^<]*)</{tag}>", dev)
                 return m.group(1) if m else None
             umid, auth = g("id"), g("out-auth-code")
