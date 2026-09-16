@@ -3,13 +3,19 @@
     "step": {
       "user": {
         "title": "Cuenta Golmar / Quvii",
-        "description": "Inicia sesión con tu cuenta Golmar G2Call+ (u otra aplicación de portero basada en Quvii). Las credenciales se usan una sola vez para obtener la clave local de cada placa; la apertura de puertas es después 100 % local. Deja App ID / OEM ID tal cual para Golmar.",
+        "description": "Inicia sesión con tu cuenta Golmar G2Call+ (u otra aplicación de portero basada en Quvii). Las credenciales se usan para obtener la clave local de cada placa; la apertura de puertas es después local, salvo que elijas otra cosa más abajo. Deja App ID / OEM ID tal cual para Golmar.",
         "data": {
           "account": "Cuenta (correo o teléfono, ej. +34...)",
           "password": "Contraseña",
           "region": "ID de región (1 = Europa)",
           "app_id": "App ID (avanzado — Golmar = 4053)",
-          "oem_id": "OEM ID (avanzado — Golmar = G0053,A0053)"
+          "oem_id": "OEM ID (avanzado — Golmar = G0053,A0053)",
+          "unlock_mode": "Modo de apertura: local / auto / cloud",
+          "extra_hosts": "Direcciones de placas adicionales (opcional, separadas por comas)"
+        },
+        "data_description": {
+          "unlock_mode": "local = solo red local, lo más rápido y funciona sin Internet. cloud = envía la orden de apertura a través de los servidores de Quvii; necesario en placas cuyo firmware solo abre la interfaz local mientras la aplicación transmite vídeo. auto = intenta primero en local y recurre a la nube.",
+          "extra_hosts": "Solo hace falta si una placa no está en la misma subred que Home Assistant, por ejemplo en otra VLAN. La detección recorre la subred local automáticamente."
         }
       },
       "select": {
@@ -35,7 +41,13 @@
         "title": "Puertas a controlar",
         "description": "Actualiza qué placas y cerraduras aparecen como botones: haz que coincidan con lo que abres desde la aplicación oficial de Golmar. Solo los canales cableados a tu placa abren de verdad; desmarca el resto.",
         "data": {
-          "locks": "Puertas / cerraduras"
+          "locks": "Puertas / cerraduras",
+          "unlock_mode": "Modo de apertura: local / auto / cloud",
+          "extra_hosts": "Direcciones de placas adicionales (opcional, separadas por comas)"
+        },
+        "data_description": {
+          "unlock_mode": "local = solo red local, lo más rápido y funciona sin Internet. cloud = envía la orden de apertura a través de los servidores de Quvii; necesario en placas cuyo firmware solo abre la interfaz local mientras la aplicación transmite vídeo. auto = intenta primero en local y recurre a la nube.",
+          "extra_hosts": "Solo hace falta si una placa no está en la misma subred que Home Assistant, por ejemplo en otra VLAN."
         }
       }
     }

@@ -1,9 +1,14 @@
 # Golmar / Quvii Local (Home Assistant)
 
 Local control of **Golmar G2Call+** video door stations from Home Assistant.
-You sign in **once** with your Golmar account; the integration retrieves each
-panel's local access key and then opens doors **100 % locally** over your LAN —
-no cloud in the loop after setup.
+You sign in with your Golmar account; the integration retrieves each panel's
+local access key and then opens doors **locally** over your LAN — no cloud in
+the loop when a door is opened.
+
+Some newer firmware only opens the panel's local interface while the phone app
+is streaming video, which leaves nothing on the LAN to talk to. Those panels can
+opt into a **cloud unlock** path instead — see
+[How doors are opened](#how-doors-are-opened). Local remains the default.
 
 > **Tested with:** Golmar G2Call+ (`ART7W‑G2+`).
 > Golmar is one of several brands built on the **Quvii** platform, so other
@@ -23,12 +28,21 @@ no cloud in the loop after setup.
 >
 > Anyone who joins your Wi‑Fi and holds the key can open the door. If that isn't
 > acceptable for your situation, don't install this.
+>
+> **Cloud unlock changes this trade‑off.** In `cloud` or `auto` mode the open
+> command is sent through the vendor's servers using your account credentials,
+> so your LAN is no longer the boundary: anyone who can reach your Home
+> Assistant, or who holds your Golmar account password, can open the door from
+> anywhere. It also stops working when your internet or the vendor does. Only
+> enable it if your panel genuinely cannot be reached locally.
 
 ## Requirements
 
 - A **Wi‑Fi‑connected Golmar monitor**, already set up in the **G2Call+** app and
   reachable on your home network. (Bus‑only / non‑Wi‑Fi Golmar monitors won't work.)
-- The monitor must be on the **same LAN as Home Assistant**.
+- The monitor should be on the **same LAN as Home Assistant**. A panel on another
+  subnet or VLAN can still be used by listing its address under **Extra panel
+  addresses**; a panel that never exposes its local interface needs cloud mode.
 
 **Supported hardware:** any G2Call+‑compatible Golmar **Wi‑Fi** monitor *should*
 work — chiefly the **ART 7W** (Art 7 Wi‑Fi) and **SOUL** Wi‑Fi families.
@@ -37,15 +51,40 @@ please report what works (or doesn't) so this list can grow.
 
 ## How it works
 
-1. **Cloud, once at setup:** signs in with your account and retrieves each
-   panel's local access key and identifier.
-2. **LAN discovery:** finds your panels on the local network and matches them to
-   your account.
-3. **Local control:** each door/lock becomes a Home Assistant **button** that
-   opens the door directly on your LAN.
+1. **Cloud, at setup:** signs in with your account and retrieves each panel's
+   local access key and identifier.
+2. **Discovery:** finds your panels on the network and matches them to your
+   account. Home Assistant's own subnet is swept on port 443 first and port 80
+   only if a panel is still missing — the CGI answers identically on both, and
+   far fewer hosts listen on 443, which keeps the scan small. Each candidate is
+   first probed with a **junk key**: a panel answers `error 401`, anything else
+   does not, so your real access key is only ever sent to confirmed panels.
+3. **Control:** each door/lock becomes a Home Assistant **button**.
 
-The cloud is contacted only at setup and for a periodic key refresh — opening a
-door never touches the internet.
+In the default `local` mode the cloud is contacted only at setup and for a
+periodic key refresh — opening a door never touches the internet.
+
+## How doors are opened
+
+Set **How to open doors** in the config flow, or later under **Configure**:
+
+| Mode | Behaviour | Use when |
+|------|-----------|----------|
+| `local` *(default)* | LAN only | Your panel answers on the LAN. Fastest, works with no internet, key never leaves the network. |
+| `auto` | LAN first, cloud if that fails | The local interface comes and goes — e.g. firmware that only opens it while the app streams video. |
+| `cloud` | Vendor servers only | The panel never exposes a local interface. Discovery is skipped entirely. |
+
+Cloud mode needs two extra secrets that the account already hands out: a
+short‑lived **dynamic password** per panel (it expires in days, so the device
+list is renewed before each expiry rather than monthly) and an **OAuth token**
+valid for one hour, minted on demand and cached.
+
+> **Cloud unlock is unverified on real hardware.** The author's panel — an
+> `ART7W‑G2+` on 2021 firmware — is not registered on the vendor's cloud control
+> plane at all, so every cloud open on it returns *device not registered* and no
+> relay can be actuated to prove the path. The transport, token handling and
+> error classification are verified against the live service; the final open is
+> not. If your panel needs this mode, please report whether it works.
 
 ## Install
 
@@ -62,7 +101,10 @@ In HACS, search for **“Golmar / Quvii Local”** and click **Download**.
 
 **Settings → Devices & Services → Add Integration → “Golmar / Quvii Local”** →
 enter your account (email or `+phone`) and password. Leave the advanced **App ID
-/ OEM ID** fields as‑is for Golmar.
+/ OEM ID** fields as‑is for Golmar, and leave **How to open doors** on `local`
+unless your panel can't be reached on the LAN. **Extra panel addresses** is only
+needed for a panel outside Home Assistant's own subnet — a VLAN, say — and takes
+a comma‑separated list of addresses.
 
 The integration then finds your panels on the LAN and shows a **“Choose which
 doors to control”** step listing every panel/lock it detected — block entrances
@@ -99,16 +141,22 @@ just pick it. (App ID / OEM ID are app‑specific values; region `1` = Europe.)
 
 ## Notes & limitations
 
-- **Panel must be reachable on the same LAN as Home Assistant.** If
-  auto‑discovery misses it, the button shows unavailable.
+- **In `local` mode the panel must be reachable from Home Assistant.** If
+  discovery misses it, the buttons show unavailable; add its address under
+  **Extra panel addresses**, or switch to `auto`/`cloud`.
+- **Some firmware keeps the local interface shut** unless the phone app is
+  streaming video. Reported on `ART4WH/G2+` firmware 2.02; the workaround is
+  `auto` or `cloud` mode.
 - The number of doors/locks isn't reported, so four buttons are created per
   panel; disable the ones you don't use.
 - **Security:** see the ⚠️ warning at the top — anyone on your LAN who has the
-  key can open the doors. Keep it on a trusted, segmented network.
-- **Credentials:** your account password is used only once to fetch the local
-  keys and is then stored by HA like any other integration credential; the key
-  and door control stay on your LAN. The panel uses a self‑signed certificate
-  (LAN only).
+  key can open the doors, and cloud mode widens that further. Keep it on a
+  trusted, segmented network.
+- **Credentials:** your account password is stored by HA like any other
+  integration credential. In `local` mode it is used only to fetch the local
+  keys, and door control stays on your LAN; in `cloud`/`auto` mode it is also
+  used to mint the hourly token that carries the open command. The panel uses a
+  self‑signed certificate (LAN only).
 - **Unofficial & unsupported:** this is not an official integration; the vendor
   may change their service at any time and break it. Use at your own risk.
 

@@ -3,13 +3,19 @@
     "step": {
       "user": {
         "title": "Golmar / Quvii account",
-        "description": "Sign in with your Golmar G2Call+ account (or another Quvii-based intercom app). Credentials are used once to fetch each panel's local key; door control afterwards is 100% local. Leave App ID / OEM ID as-is for Golmar.",
+        "description": "Sign in with your Golmar G2Call+ account (or another Quvii-based intercom app). Credentials are used to fetch each panel's local key; door control afterwards is local unless you choose otherwise below. Leave App ID / OEM ID as-is for Golmar.",
         "data": {
           "account": "Account (email or phone, e.g. +33...)",
           "password": "Password",
           "region": "Region id (1 = Europe)",
           "app_id": "App ID (advanced — Golmar = 4053)",
-          "oem_id": "OEM ID (advanced — Golmar = G0053,A0053)"
+          "oem_id": "OEM ID (advanced — Golmar = G0053,A0053)",
+          "unlock_mode": "How to open doors: local / auto / cloud",
+          "extra_hosts": "Extra panel addresses (optional, comma separated)"
+        },
+        "data_description": {
+          "unlock_mode": "local = LAN only, fastest and works without internet. cloud = send the open command through the Quvii servers; needed by panels whose firmware only opens the local interface while the app is streaming video. auto = try local first, fall back to cloud.",
+          "extra_hosts": "Only needed if a panel is not on Home Assistant's own subnet — for example on a separate VLAN. Discovery scans the local subnet automatically."
         }
       },
       "select": {
@@ -35,7 +41,13 @@
         "title": "Doors to control",
         "description": "Update which panels and locks appear as buttons — match what you open from the official Golmar app. Only channels wired to your panel actually open; untick the rest.",
         "data": {
-          "locks": "Doors / locks"
+          "locks": "Doors / locks",
+          "unlock_mode": "How to open doors: local / auto / cloud",
+          "extra_hosts": "Extra panel addresses (optional, comma separated)"
+        },
+        "data_description": {
+          "unlock_mode": "local = LAN only, fastest and works without internet. cloud = send the open command through the Quvii servers; needed by panels whose firmware only opens the local interface while the app is streaming video. auto = try local first, fall back to cloud.",
+          "extra_hosts": "Only needed if a panel is not on Home Assistant's own subnet — for example on a separate VLAN."
         }
       }
     }

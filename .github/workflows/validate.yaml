@@ -20,3 +20,17 @@ jobs:
       - uses: actions/checkout@v4
       - name: Hassfest validation
         uses: home-assistant/actions/hassfest@master
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Lint
+        run: |
+          pip install ruff
+          ruff check custom_components/
+      - name: Unlock routing tests
+        # Home Assistant is stubbed, so this needs no install and no hardware.
+        run: python tests/test_button_logic.py

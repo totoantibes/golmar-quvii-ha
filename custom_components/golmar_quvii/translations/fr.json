@@ -3,13 +3,19 @@
     "step": {
       "user": {
         "title": "Compte Golmar / Quvii",
-        "description": "Connectez-vous avec votre compte Golmar G2Call+ (ou une autre application d'interphone basée sur Quvii). Vos identifiants ne servent qu'une seule fois à récupérer la clé locale de chaque platine ; l'ouverture des portes se fait ensuite 100 % en local. Laissez App ID / OEM ID tels quels pour Golmar.",
+        "description": "Connectez-vous avec votre compte Golmar G2Call+ (ou une autre application d'interphone basée sur Quvii). Vos identifiants servent à récupérer la clé locale de chaque platine ; l'ouverture des portes se fait ensuite en local, sauf si vous choisissez autrement ci-dessous. Laissez App ID / OEM ID tels quels pour Golmar.",
         "data": {
           "account": "Compte (e-mail ou téléphone, ex. +33...)",
           "password": "Mot de passe",
           "region": "Identifiant de région (1 = Europe)",
           "app_id": "App ID (avancé — Golmar = 4053)",
-          "oem_id": "OEM ID (avancé — Golmar = G0053,A0053)"
+          "oem_id": "OEM ID (avancé — Golmar = G0053,A0053)",
+          "unlock_mode": "Mode d'ouverture : local / auto / cloud",
+          "extra_hosts": "Adresses de platines supplémentaires (facultatif, séparées par des virgules)"
+        },
+        "data_description": {
+          "unlock_mode": "local = réseau local uniquement, le plus rapide et fonctionne sans Internet. cloud = envoie la commande d'ouverture via les serveurs Quvii ; nécessaire pour les platines dont le micrologiciel n'ouvre l'interface locale que pendant la diffusion vidéo de l'application. auto = essaie d'abord en local, puis bascule sur le cloud.",
+          "extra_hosts": "Utile uniquement si une platine n'est pas sur le même sous-réseau que Home Assistant — par exemple sur un VLAN séparé. La détection balaie automatiquement le sous-réseau local."
         }
       },
       "select": {
@@ -35,7 +41,13 @@
         "title": "Portes à commander",
         "description": "Modifiez les platines et gâches proposées comme boutons — accordez-les à ce que vous ouvrez depuis l'application Golmar officielle. Seuls les canaux câblés à votre platine ouvrent réellement ; décochez les autres.",
         "data": {
-          "locks": "Portes / gâches"
+          "locks": "Portes / gâches",
+          "unlock_mode": "Mode d'ouverture : local / auto / cloud",
+          "extra_hosts": "Adresses de platines supplémentaires (facultatif, séparées par des virgules)"
+        },
+        "data_description": {
+          "unlock_mode": "local = réseau local uniquement, le plus rapide et fonctionne sans Internet. cloud = envoie la commande d'ouverture via les serveurs Quvii ; nécessaire pour les platines dont le micrologiciel n'ouvre l'interface locale que pendant la diffusion vidéo de l'application. auto = essaie d'abord en local, puis bascule sur le cloud.",
+          "extra_hosts": "Utile uniquement si une platine n'est pas sur le même sous-réseau que Home Assistant — par exemple sur un VLAN séparé."
         }
       }
     }
