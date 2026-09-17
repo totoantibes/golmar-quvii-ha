@@ -140,6 +140,14 @@ async def main():
         check(f"{mode}: local={has_local} dynpw={bool(dynpw)}", btn.available, want)
 
     print("\n== press routing ==")
+    # the default path: local mode, panel answers, nothing else involved
+    local = FakeLocal(True)
+    coord = FakeCoordinator("local", local)
+    btn = make_button(button_mod, coord)
+    await btn.async_press()
+    check("local mode opened the right relay", local.calls, [(9, 2)])
+    check("local mode never touched the cloud", coord.cloud_control.calls, [])
+
     # local mode never reaches the cloud, even when the panel refuses
     local = FakeLocal(False)
     coord = FakeCoordinator("local", local)
