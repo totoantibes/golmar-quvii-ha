@@ -28,10 +28,10 @@ from .const import (
     DEFAULT_LB,
     DEFAULT_OEM_ID,
     DEFAULT_REGION,
-    OAUTH_HOST,
+    OAUTH_HOST_TEMPLATE,
     OAUTH_PATH,
     OPENAPI_CONTROL_PATH,
-    OPENAPI_HOST,
+    OPENAPI_HOST_TEMPLATE,
     TOKEN_DEFAULT_TTL,
     TOKEN_EXPIRY_MARGIN,
 )
@@ -152,7 +152,14 @@ class QuviiCloud:
 
 
 def parse_expiry(value: str | None) -> datetime | None:
-    """Parse the device list's password-expired stamp ("YYYY-MM-DD HH:MM:SS", UTC)."""
+    """Parse the device list's password-expired stamp ("YYYY-MM-DD HH:MM:SS").
+
+    The stamp carries no timezone and the service does not document one; it is
+    read as UTC. That assumption is unverified - the renewal margin in the
+    coordinator is wide enough to absorb a several-hour error, which is why it
+    has not been chased further. An unreadable stamp returns None, and the
+    coordinator then refreshes conservatively rather than trusting the default.
+    """
     if not value:
         return None
     try:
@@ -204,14 +211,53 @@ class QuviiCloudControl:
         self._app_id = app_id
         self._oem_id = oem_id
         self._client_id = f"003-{app_id}-{CLIENT_SUFFIX}"
+        self._oauth_url = OAUTH_HOST_TEMPLATE.format(region=region) + OAUTH_PATH
+        self._control_url = (
+            OPENAPI_HOST_TEMPLATE.format(region=region) + OPENAPI_CONTROL_PATH
+        )
         self._token: str | None = None
         self._token_expires: float = 0.0
+
+    @staticmethod
+    def _payload_error(payload: object) -> int | None:
+        """Return the panel's own error code from a control response, if present.
+
+        The outer `result` only says whether the cloud accepted the command and
+        dispatched it. The panel's own answer rides along in `payload` as a
+        JSON-encoded string, so `{"result":0,"payload":"{\\"error\\":401}"}` is a
+        command the cloud delivered and the panel refused.
+
+        None means there was nothing readable, in which case the outer result is
+        all the caller has to go on.
+        """
+        if isinstance(payload, str):
+            try:
+                payload = json.loads(payload)
+            except ValueError:
+                return None
+        if not isinstance(payload, dict):
+            return None
+        for candidate in (payload, payload.get("body")):
+            if not isinstance(candidate, dict):
+                continue
+            err = candidate.get("error")
+            # bool is an int subclass, and a JSON true here would not be a code
+            if isinstance(err, bool) or not isinstance(err, (int, float)):
+                continue
+            return int(err)
+        return None
 
     async def _async_token(self, session: aiohttp.ClientSession) -> str:
         """Return a valid access token, minting one if the cached one is stale.
 
         Minting is deliberately lazy: it happens on the first cloud unlock and
         then roughly hourly while doors are being opened, rather than on a timer.
+
+        The response also carries a refresh token, which this deliberately does
+        not use. Re-running the password grant is one request either way and
+        keeps a single verified code path; the refresh grant would add a second
+        one for no gain. If re-authenticating this often ever turns out to
+        disturb the phone app's session, the refresh grant is the fix.
         """
         if self._token and time.time() < self._token_expires:
             return self._token
@@ -228,13 +274,20 @@ class QuviiCloudControl:
         }
         try:
             async with session.get(
-                OAUTH_HOST + OAUTH_PATH, params=params,
+                self._oauth_url, params=params,
                 timeout=aiohttp.ClientTimeout(total=15),
             ) as resp:
                 body = await resp.text()
                 status = resp.status
         except (aiohttp.ClientError, TimeoutError) as err:
-            raise QuviiCloudError(f"token request failed: {err}") from err
+            # The account and the password hash travel in this URL's query
+            # string, and aiohttp puts the request URL into several of its
+            # exception messages. Neither the message nor a chained traceback
+            # may carry it into the logs or the UI, so only the exception type
+            # is reported and the cause is deliberately dropped.
+            raise QuviiCloudError(
+                f"token request failed ({type(err).__name__})"
+            ) from None
 
         try:
             doc = json.loads(body)
@@ -276,7 +329,7 @@ class QuviiCloudControl:
         }
         try:
             async with session.post(
-                OPENAPI_HOST + OPENAPI_CONTROL_PATH, json=payload,
+                self._control_url, json=payload,
                 headers={"token": token},
                 timeout=aiohttp.ClientTimeout(total=20),
             ) as resp:
@@ -291,7 +344,25 @@ class QuviiCloudControl:
 
         result = doc.get("result")
         if result == 0:
-            return
+            # Dispatch succeeded; the panel's own verdict is a second, nested
+            # response. Accepting the outer result alone would report a refused
+            # command as a successful open.
+            inner = self._payload_error(doc.get("payload"))
+            if inner is None:
+                _LOGGER.debug(
+                    "Cloud accepted the command but returned no readable device "
+                    "payload (%r); treating the dispatch as success",
+                    doc.get("payload"),
+                )
+                return
+            if inner == 0:
+                return
+            if inner == 401:
+                raise QuviiAuthError(
+                    "the panel refused the command's credentials (error 401); the "
+                    "stored keys may be stale - reload the integration"
+                )
+            raise QuviiCloudError(f"the panel refused the command (error {inner})")
         message = doc.get("message") or ""
         if result == -1:
             # token rejected - drop it so the next attempt mints a fresh one

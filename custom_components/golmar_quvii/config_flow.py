@@ -30,6 +30,7 @@ from .const import (
     DEFAULT_REGION,
     DEFAULT_UNLOCK_MODE,
     DOMAIN,
+    MODE_CLOUD,
     UNLOCK_MODES,
 )
 from .device import QuviiLocalDevice, async_discover_ips
@@ -63,20 +64,30 @@ def _add_locks(umid: str, name: str, locks: list[dict], catalog: dict[str, dict]
 
 
 async def _discover_catalog(
-    hass: HomeAssistant, devices: list[dict], extra_hosts: list[str] | None = None
+    hass: HomeAssistant,
+    devices: list[dict],
+    extra_hosts: list[str] | None = None,
+    skip_discovery: bool = False,
 ) -> dict[str, dict]:
     """Scan the network and list each panel's real door/lock relays.
 
     Returns {"umid:door:lock": {umid,door,lock,name,label,enabled}}. Panels that
     can't be reached fall back to the static DEFAULT_LOCKS so the user can still
     pick something and refine later via the options flow.
+
+    skip_discovery is set for cloud mode, which never contacts the panel over the
+    network: sweeping would only delay setup, and the panels that need cloud mode
+    are precisely the ones a sweep cannot find.
     """
     names = {d["umid"]: (d.get("name") or d["umid"]) for d in devices}
     by_auth = {d["umid"]: d["authcode"] for d in devices}
-    try:
-        endpoints = await async_discover_ips(by_auth, extra_hosts)
-    except Exception:  # noqa: BLE001 - discovery is best-effort
-        endpoints = {}
+    if skip_discovery:
+        endpoints: dict[str, dict] = {}
+    else:
+        try:
+            endpoints = await async_discover_ips(by_auth, extra_hosts)
+        except Exception:  # noqa: BLE001 - discovery is best-effort
+            endpoints = {}
 
     catalog: dict[str, dict] = {}
     session = async_get_clientsession(hass)
@@ -145,14 +156,15 @@ class GolmarQuviiConfigFlow(ConfigFlow, domain=DOMAIN):
                     await self.async_set_unique_id(user_input[CONF_ACCOUNT])
                     self._abort_if_unique_id_configured()
                     self._data = {k: v for k, v in user_input.items() if k not in _OPTION_KEYS}
+                    mode = user_input.get(CONF_UNLOCK_MODE, DEFAULT_UNLOCK_MODE)
                     self._options = {
-                        CONF_UNLOCK_MODE: user_input.get(
-                            CONF_UNLOCK_MODE, DEFAULT_UNLOCK_MODE
-                        ),
+                        CONF_UNLOCK_MODE: mode,
                         CONF_EXTRA_HOSTS: user_input.get(CONF_EXTRA_HOSTS, ""),
                     }
                     self._catalog = await _discover_catalog(
-                        self.hass, devices, _split_hosts(user_input.get(CONF_EXTRA_HOSTS))
+                        self.hass, devices,
+                        _split_hosts(user_input.get(CONF_EXTRA_HOSTS)),
+                        skip_discovery=mode == MODE_CLOUD,
                     )
                     return await self.async_step_select()
 

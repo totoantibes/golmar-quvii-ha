@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 
+import aiohttp
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -17,6 +18,7 @@ from .const import (
     CONF_LOCKS,
     DEFAULT_LOCKS,
     DOMAIN,
+    MODE_AUTO,
     MODE_CLOUD,
     MODE_LOCAL,
 )
@@ -128,9 +130,27 @@ class GolmarQuviiButton(CoordinatorEntity, ButtonEntity):
             try:
                 if await device.async_open(session, self._door, self._lock):
                     return
+                # The panel answered and refused, so no relay moved and another
+                # transport may safely try the same command.
                 local_error = f"panel rejected open door={self._door} lock={self._lock}"
-            except Exception as err:  # noqa: BLE001 - any local failure may be retried via cloud
-                local_error = str(err) or type(err).__name__
+            except aiohttp.ClientConnectorError as err:
+                # The connection was never established, so the command cannot
+                # have reached the panel. Safe to try another transport.
+                local_error = f"could not reach the panel ({type(err).__name__})"
+            except Exception as err:  # classified below, then re-raised
+                # Anything else - a timeout, a connection dropped mid-request -
+                # is ambiguous: the panel may have received and executed the
+                # command before the failure. Opening again through the cloud
+                # would actuate a second time, and on a relay that toggles
+                # (a sliding gate cycling open -> stop -> close) that reverses
+                # the movement the user asked for. Report the uncertainty.
+                detail = (
+                    f"local open of door={self._door} lock={self._lock} did not "
+                    f"complete ({type(err).__name__}); the panel may already have acted"
+                )
+                if mode == MODE_AUTO:
+                    detail += ", so it was not retried through the cloud"
+                raise HomeAssistantError(detail) from err
         else:
             local_error = f"panel {self._umid} was not found on the network"
 

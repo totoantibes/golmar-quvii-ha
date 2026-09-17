@@ -61,6 +61,10 @@ RETRY_INTERVAL = timedelta(minutes=15)
 # than on the monthly cycle, and never at all in local mode.
 DYNAMIC_PASSWORD_MARGIN = timedelta(hours=12)
 MIN_CLOUD_INTERVAL = timedelta(hours=1)
+# Used when a panel's expiry stamp is missing or unparseable. The credential is
+# known to last days, so the monthly default would be far too slow, and guessing
+# optimistically would mean losing cloud unlock with no warning.
+UNKNOWN_EXPIRY_INTERVAL = timedelta(hours=12)
 
 STORAGE_VERSION = 1
 STORAGE_KEY = DOMAIN + "_ips"
@@ -113,13 +117,23 @@ class GolmarQuviiCoordinator(DataUpdateCoordinator):
                     self.endpoints[umid] = endpoint
         self._endpoints_loaded = True
 
-    def _next_expiry(self, devices: list[dict]) -> datetime | None:
-        stamps = [
-            expiry
-            for expiry in (parse_expiry(d.get("password_expired")) for d in devices)
-            if expiry is not None
-        ]
-        return min(stamps) if stamps else None
+    def _expiry_window(self, devices: list[dict]) -> tuple[datetime | None, bool]:
+        """Return (soonest known expiry, whether any expiry is unreadable).
+
+        The two are reported separately on purpose. A device whose stamp is
+        missing or unparseable must not be hidden behind another device's known
+        expiry - with only the minimum, one readable stamp a month away would
+        silently set the schedule for a panel whose credential expires in days.
+        """
+        soonest: datetime | None = None
+        unknown = False
+        for device in devices:
+            expiry = parse_expiry(device.get("password_expired"))
+            if expiry is None:
+                unknown = True
+            elif soonest is None or expiry < soonest:
+                soonest = expiry
+        return soonest, unknown
 
     async def _async_refresh_cloud_devices(self, force: bool) -> list[dict]:
         if self._cloud_devices is not None and not force:
@@ -147,8 +161,12 @@ class GolmarQuviiCoordinator(DataUpdateCoordinator):
         # cloud unlocking uses it, so local-mode installs keep the monthly cycle.
         stale = False
         if wants_cloud and self._cloud_devices is not None:
-            expiry = self._next_expiry(self._cloud_devices)
-            stale = expiry is None or expiry - DYNAMIC_PASSWORD_MARGIN <= datetime.now(timezone.utc)
+            expiry, unknown = self._expiry_window(self._cloud_devices)
+            stale = (
+                unknown
+                or expiry is None
+                or expiry - DYNAMIC_PASSWORD_MARGIN <= datetime.now(timezone.utc)
+            )
         devs = await self._async_refresh_cloud_devices(force=stale)
         by_auth = {d["umid"]: d["authcode"] for d in devs}
 
@@ -222,10 +240,15 @@ class GolmarQuviiCoordinator(DataUpdateCoordinator):
 
         target = UPDATE_INTERVAL
         if wants_cloud:
-            expiry = self._next_expiry(devs)
+            expiry, unknown = self._expiry_window(devs)
             if expiry:
                 due = expiry - DYNAMIC_PASSWORD_MARGIN - datetime.now(timezone.utc)
                 target = max(MIN_CLOUD_INTERVAL, min(target, due))
+            if unknown:
+                # The credential lasts days. A stamp we cannot read must not
+                # inherit the monthly default, or the panel silently loses cloud
+                # unlock partway through the month.
+                target = min(target, UNKNOWN_EXPIRY_INTERVAL)
         if unresolved or recheck_failed:
             target = min(target, RETRY_INTERVAL)
         elif self.update_interval != target:

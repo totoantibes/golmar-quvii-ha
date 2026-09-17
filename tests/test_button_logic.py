@@ -176,13 +176,45 @@ async def main():
     check("auto fell back after rejection", coord.cloud_control.calls,
           [("u1", 9, 2, True)])
 
-    # auto: local raises (panel closed its port mid-press) -> cloud takes over
-    local = FakeLocal(OSError("connection refused"))
+    # auto: connection never established -> nothing was sent -> cloud may retry
+    import aiohttp
+    conn_key = aiohttp.client_reqrep.ConnectionKey(
+        "192.168.1.82", 443, False, True, None, None, None)
+    local = FakeLocal(aiohttp.ClientConnectorError(conn_key, OSError("refused")))
     coord = FakeCoordinator("auto", local)
     btn = make_button(button_mod, coord)
     await btn.async_press()
-    check("auto fell back after exception", coord.cloud_control.calls,
+    check("auto fell back after connect failure", coord.cloud_control.calls,
           [("u1", 9, 2, True)])
+
+    # auto: ambiguous failure AFTER the command may have been delivered.
+    # Retrying would actuate a second time; on a gate that toggles
+    # open -> stop -> close that reverses the movement the user asked for.
+    for label, exc in (("timeout", TimeoutError()),
+                       ("server disconnected", aiohttp.ServerDisconnectedError()),
+                       ("mid-request OS error", aiohttp.ClientOSError(104, "reset"))):
+        local = FakeLocal(exc)
+        coord = FakeCoordinator("auto", local)
+        btn = make_button(button_mod, coord)
+        try:
+            await btn.async_press()
+            check(f"ambiguous ({label}) is not retried", "no error", "HomeAssistantError")
+        except ha_error as err:
+            check(f"ambiguous ({label}) is not retried",
+                  "may already have acted" in str(err), True)
+        check(f"ambiguous ({label}) did not open via cloud",
+              coord.cloud_control.calls, [])
+
+    # same ambiguity in local mode: still an error, without the cloud wording
+    local = FakeLocal(TimeoutError())
+    coord = FakeCoordinator("local", local)
+    btn = make_button(button_mod, coord)
+    try:
+        await btn.async_press()
+        check("local mode surfaces ambiguity", "no error", "HomeAssistantError")
+    except ha_error as err:
+        check("local mode surfaces ambiguity",
+              "may already have acted" in str(err) and "cloud" not in str(err), True)
 
     # auto: no local endpoint at all -> cloud directly
     coord = FakeCoordinator("auto", None)
@@ -202,6 +234,21 @@ async def main():
     except ha_error as err:
         check("auto reports both failures",
               "local failed" in str(err) and "cloud failed" in str(err), True)
+
+    print("\n== cloud response: the panel's own verdict rides inside payload ==")
+    ctrl = cloud_mod.QuviiCloudControl("acct", "pw")
+    cases = [
+        ("refusal wrapped in a successful dispatch", '{"error":401}', 401),
+        ("nested under body", '{"body":{"error":7}}', 7),
+        ("explicit success", '{"error":0}', 0),
+        ("already decoded", {"error": 12}, 12),
+        ("no payload", None, None),
+        ("unparseable payload", "not json", None),
+        ("payload without a code", '{"foo":1}', None),
+        ("boolean is not a code", '{"error":true}', None),
+    ]
+    for label, payload, want in cases:
+        check(f"payload: {label}", ctrl._payload_error(payload), want)
 
     print("\n== diagnostics attribute ==")
     coord = FakeCoordinator("auto", FakeLocal(True))

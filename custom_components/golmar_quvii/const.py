@@ -43,10 +43,13 @@ CLIENT_TYPE = "3"
 # client id: sharing one would put both on the same session.
 CLIENT_SUFFIX = "haquviilocal01"
 
-# Cloud control plane (only used by MODE_CLOUD / MODE_AUTO).
-OAUTH_HOST = "https://oauth2r1.qvcloud.net"
+# Cloud control plane (only used by MODE_CLOUD / MODE_AUTO). Both hosts are
+# region scoped in the same "r<region>" style as the account plane. Only region 1
+# has been exercised against the live service; other regions follow the pattern
+# but are unverified.
+OAUTH_HOST_TEMPLATE = "https://oauth2r{region}.qvcloud.net"
 OAUTH_PATH = "/qvoauthv2/token"
-OPENAPI_HOST = "https://tdkopenapir1.qvcloud.net"
+OPENAPI_HOST_TEMPLATE = "https://tdkopenapir{region}.qvcloud.net"
 OPENAPI_CONTROL_PATH = "/openapi-tdk/devctr/synccontrol/singledev"
 # Tokens carry an exp claim (one hour, measured) but no expires_in field, so the
 # claim is what we cache against. Re-mint a little early to avoid racing it.

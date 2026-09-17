@@ -71,20 +71,30 @@ Set **How to open doors** in the config flow, or later under **Configure**:
 | Mode | Behaviour | Use when |
 |------|-----------|----------|
 | `local` *(default)* | LAN only | Your panel answers on the LAN. Fastest, works with no internet, key never leaves the network. |
-| `auto` | LAN first, cloud if that fails | The local interface comes and goes — e.g. firmware that only opens it while the app streams video. |
-| `cloud` | Vendor servers only | The panel never exposes a local interface. Discovery is skipped entirely. |
+| `auto` | LAN first, cloud if that fails | The local interface is usually there but not always. |
+| `cloud` | Vendor servers only | The panel exposes no local interface. Discovery is skipped entirely. |
+
+**If your panel only opens its ports while the app streams video, choose
+`cloud`, not `auto`.** On the panels reported so far the local interface is shut
+within seconds of closing the app, so `auto` spends time on a local attempt that
+is almost always going to fail.
 
 Cloud mode needs two extra secrets that the account already hands out: a
 short‑lived **dynamic password** per panel (it expires in days, so the device
 list is renewed before each expiry rather than monthly) and an **OAuth token**
 valid for one hour, minted on demand and cached.
 
-> **Cloud unlock is unverified on real hardware.** The author's panel — an
-> `ART7W‑G2+` on 2021 firmware — is not registered on the vendor's cloud control
-> plane at all, so every cloud open on it returns *device not registered* and no
-> relay can be actuated to prove the path. The transport, token handling and
-> error classification are verified against the live service; the final open is
-> not. If your panel needs this mode, please report whether it works.
+> **Cloud unlock is confirmed working on affected hardware by a contributor**
+> (both doors, reliably — thanks @victor-marino), but **not by the author**: this
+> project's own panel is not registered on the vendor's control plane at all, so
+> every cloud open on it returns *device not registered*. Treat it as tested by
+> one person on one panel rather than broadly proven, and please report how it
+> behaves on yours.
+>
+> Two limits worth knowing. Only `door 1` locks 1 and 2 have been exercised over
+> the cloud; higher channels (the `General Panel N` street entrances) are
+> untested on this path. And the OAuth and control hosts are region‑scoped, but
+> only region 1 has ever been contacted.
 
 ## Install
 
@@ -144,9 +154,15 @@ just pick it. (App ID / OEM ID are app‑specific values; region `1` = Europe.)
 - **In `local` mode the panel must be reachable from Home Assistant.** If
   discovery misses it, the buttons show unavailable; add its address under
   **Extra panel addresses**, or switch to `auto`/`cloud`.
-- **Some firmware keeps the local interface shut** unless the phone app is
-  streaming video. Reported on `ART4WH/G2+` firmware 2.02; the workaround is
-  `auto` or `cloud` mode.
+- **Some panels keep every local port shut** unless the phone app is actively
+  streaming video from that door — not just 443, and not just the CGI. They
+  close again within seconds of leaving the stream. Reported on two units so
+  far. **What decides this is not established** — not model, not screen size,
+  and not firmware age as far as anyone can tell — so the integration does not
+  try to detect it. If your panel behaves this way, select `cloud`.
+- **`cloud_available` on a button means a dynamic password is cached** for that
+  panel, i.e. the cloud path is configured. It is not a statement that the
+  token, the credential and the vendor's service have been checked and work.
 - The number of doors/locks isn't reported, so four buttons are created per
   panel; disable the ones you don't use.
 - **Security:** see the ⚠️ warning at the top — anyone on your LAN who has the
