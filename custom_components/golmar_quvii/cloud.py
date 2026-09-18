@@ -47,6 +47,22 @@ class QuviiAuthError(QuviiCloudError):
     """Login failed (bad account/password)."""
 
 
+class QuviiLoginRefused(QuviiCloudError):
+    """The server refused the login for a reason other than the credentials.
+
+    Worth its own type because the most likely cause is the wrong region: an
+    account lives on one regional server, and asking a different one about it
+    fails in a way that is not the user's password. Reporting that as "invalid
+    account or password" sends people to re-type a password that was never
+    wrong.
+    """
+
+
+# The one login result code whose meaning is confirmed: bad account/password.
+# Anything else is refused for a reason we cannot name, and says so.
+LOGIN_BAD_CREDENTIALS = "100100003"
+
+
 class QuviiDeviceNotRegistered(QuviiCloudError):
     """The panel is not reachable on the cloud control plane.
 
@@ -116,10 +132,9 @@ class QuviiCloud:
                      f"<password>{self._pw}</password><auth-type>0</auth-type>")
             text = await self._post(session, self._envelope(
                 "com.quvii.qvweb.userauth.bean.request.LoginReqContent", inner, "login", 1))
-            res = re.search(r"<result>(-?\d+)</result>", text)
             sid = re.search(r"<session><id>([^<]+)</id>", text)
             if not sid:
-                raise QuviiAuthError(f"login failed (result={res.group(1) if res else '?'})")
+                raise self._login_failure(text)
             session_id = sid.group(1)
 
             # 2) get-device-list
@@ -130,6 +145,30 @@ class QuviiCloud:
                 "com.quvii.qvweb.userauth.bean.request.DevListReqContent", inner,
                 "get-device-list", 2, session=session_id))
             return self._parse_devices(text)
+
+    @staticmethod
+    def _login_failure(text: str) -> QuviiCloudError:
+        """Classify a login response that came back without a session.
+
+        Only one result code has a confirmed meaning, so only that one claims the
+        credentials are wrong. Everything else is reported as a refusal carrying
+        the server's own code - which is what lets someone on the wrong regional
+        server find out that is what happened.
+        """
+        match = re.search(r"<result>(-?\d+)</result>", text)
+        result = match.group(1) if match else None
+        if result == LOGIN_BAD_CREDENTIALS:
+            return QuviiAuthError(f"account or password rejected (result={result})")
+        _LOGGER.warning(
+            "Cloud login was refused with result=%s. If the phone app signs in "
+            "with these credentials, the account may live on another region: the "
+            "Region id defaults to 1 (Europe), and 5, 6 and 7 also exist.",
+            result if result is not None else "unknown",
+        )
+        return QuviiLoginRefused(
+            f"the server refused the login (result={result or 'unknown'}); "
+            "if the app works with these credentials, check the Region id"
+        )
 
     @staticmethod
     def _parse_devices(xml: str) -> list[dict]:

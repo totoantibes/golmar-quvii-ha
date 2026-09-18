@@ -133,6 +133,20 @@ Each lock you ticked becomes an open‑door **button** (`Door 1 Lock 1`,
 match your wiring (e.g. *Street – Car Entry*), then use them in dashboards,
 automations and Siri Shortcuts like any button.
 
+## Sign‑in fails although the app works
+
+Almost always the **Region id**. Accounts live on one regional server, and asking
+a different one about yours fails — it is not your password. The integration
+defaults to region 1 (Europe); **5, 6 and 7 also exist**, with 5 hosted in the
+Americas. Try them in the config flow before suspecting the credentials.
+
+Only one server response is known to mean "wrong account or password"; anything
+else is now reported as a refusal, with the server's own code in the log, rather
+than blaming the credentials.
+
+If the account is a phone number, enter it with the country code exactly as the
+app shows it (e.g. `+34…`).
+
 ## Other Quvii brands
 
 Golmar is one brand built on the Quvii platform. Other Quvii‑based intercoms use

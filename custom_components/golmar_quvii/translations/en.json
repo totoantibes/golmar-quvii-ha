@@ -15,7 +15,8 @@
         },
         "data_description": {
           "unlock_mode": "local = LAN only, fastest and works without internet. cloud = send the open command through the Quvii servers; needed by panels whose firmware only opens the local interface while the app is streaming video. auto = try local first, fall back to cloud.",
-          "extra_hosts": "Only needed if a panel is not on Home Assistant's own subnet — for example on a separate VLAN. Discovery scans the local subnet automatically."
+          "extra_hosts": "Only needed if a panel is not on Home Assistant's own subnet — for example on a separate VLAN. Discovery scans the local subnet automatically.",
+          "region": "Region id — 1 is Europe (the default). If sign-in fails even though the phone app works with the same credentials, your account may live on another regional server: 5, 6 and 7 also exist."
         }
       },
       "select": {
@@ -29,7 +30,8 @@
     "error": {
       "invalid_auth": "Invalid account or password.",
       "cannot_connect": "Could not reach the Quvii cloud.",
-      "no_devices": "Login worked but no devices were found on this account."
+      "no_devices": "Login worked but no devices were found on this account.",
+      "login_refused": "The server refused the sign-in, but not because of the account or password. The most likely cause is the wrong Region id — try 5, 6 or 7. The server's own code is in the Home Assistant log."
     },
     "abort": {
       "already_configured": "This account is already configured."

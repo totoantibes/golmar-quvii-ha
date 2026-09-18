@@ -14,7 +14,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .cloud import QuviiAuthError, QuviiCloud, QuviiCloudError
+from .cloud import QuviiAuthError, QuviiCloud, QuviiCloudError, QuviiLoginRefused
 from .const import (
     CONF_ACCOUNT,
     CONF_APP_ID,
@@ -147,6 +147,10 @@ class GolmarQuviiConfigFlow(ConfigFlow, domain=DOMAIN):
                 devices = await cloud.async_get_devices()
             except QuviiAuthError:
                 errors["base"] = "invalid_auth"
+            except QuviiLoginRefused:
+                # Refused, but not for the credentials - most often the account
+                # lives on a different regional server than the one asked.
+                errors["base"] = "login_refused"
             except QuviiCloudError:
                 errors["base"] = "cannot_connect"
             else:

@@ -15,7 +15,8 @@
         },
         "data_description": {
           "unlock_mode": "local = réseau local uniquement, le plus rapide et fonctionne sans Internet. cloud = envoie la commande d'ouverture via les serveurs Quvii ; nécessaire pour les platines dont le micrologiciel n'ouvre l'interface locale que pendant la diffusion vidéo de l'application. auto = essaie d'abord en local, puis bascule sur le cloud.",
-          "extra_hosts": "Utile uniquement si une platine n'est pas sur le même sous-réseau que Home Assistant — par exemple sur un VLAN séparé. La détection balaie automatiquement le sous-réseau local."
+          "extra_hosts": "Utile uniquement si une platine n'est pas sur le même sous-réseau que Home Assistant — par exemple sur un VLAN séparé. La détection balaie automatiquement le sous-réseau local.",
+          "region": "Identifiant de région : 1 correspond à l'Europe (par défaut). Si la connexion échoue alors que l'application fonctionne avec les mêmes identifiants, votre compte se trouve peut-être sur un autre serveur régional : 5, 6 et 7 existent aussi."
         }
       },
       "select": {
@@ -29,7 +30,8 @@
     "error": {
       "invalid_auth": "Compte ou mot de passe invalide.",
       "cannot_connect": "Impossible de joindre le cloud Quvii.",
-      "no_devices": "Connexion réussie, mais aucun appareil trouvé sur ce compte."
+      "no_devices": "Connexion réussie, mais aucun appareil trouvé sur ce compte.",
+      "login_refused": "Le serveur a refusé la connexion, mais pas à cause du compte ou du mot de passe. La cause la plus probable est un identifiant de région incorrect : essayez 5, 6 ou 7. Le code renvoyé par le serveur figure dans le journal de Home Assistant."
     },
     "abort": {
       "already_configured": "Ce compte est déjà configuré."

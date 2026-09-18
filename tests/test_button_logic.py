@@ -258,6 +258,32 @@ async def main():
     for label, payload, want in cases:
         check(f"payload: {label}", ctrl._payload_error(payload), want)
 
+    print("\n== login failures: only the known code blames the credentials ==")
+
+    def envelope(result):
+        inner = f"<result>{result}</result>" if result is not None else ""
+        return f"<?xml version='1.0'?><envelope><body>{inner}</body></envelope>"
+
+    login_cases = [
+        # the one confirmed code -> the account or password really is wrong
+        ("confirmed bad credentials", envelope("100100003"), "QuviiAuthError"),
+        # anything else must NOT tell the user their password is wrong; the most
+        # likely cause is an account on a different regional server
+        ("unknown refusal code", envelope("100100099"), "QuviiLoginRefused"),
+        ("negative code", envelope("-1"), "QuviiLoginRefused"),
+        ("no result element at all", envelope(None), "QuviiLoginRefused"),
+        ("not xml", "<html>gateway error</html>", "QuviiLoginRefused"),
+    ]
+    for label, body, want in login_cases:
+        check(f"login: {label}",
+              type(cloud_mod.QuviiCloud._login_failure(body)).__name__, want)
+    check("refusal keeps the server's code",
+          "100100099" in str(cloud_mod.QuviiCloud._login_failure(envelope("100100099"))),
+          True)
+    check("a refusal is still a cloud error",
+          isinstance(cloud_mod.QuviiCloud._login_failure(envelope("9")),
+                     cloud_mod.QuviiCloudError), True)
+
     print("\n== diagnostics attribute ==")
     coord = FakeCoordinator("auto", FakeLocal(True))
     btn = make_button(button_mod, coord)
