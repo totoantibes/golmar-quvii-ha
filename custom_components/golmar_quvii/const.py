@@ -38,6 +38,29 @@ DEFAULT_APP_ID = "4053"
 DEFAULT_OEM_ID = "G0053,A0053"
 DEFAULT_REGION = "1"
 DEFAULT_LB = "8"          # cloud load-balancer instance (r<region>-<lb>-sec.qvcloud.net)
+
+# Account servers are r<region>-<lb>-sec.qvcloud.net, and **which lb values exist
+# depends on the region**: lb 8 serves regions 1, 5, 6 and 7 but does not exist at
+# all for 2, 3, 8 or 9. Assuming a single lb therefore does not pick a slower
+# route, it makes entire regions unresolvable - which is what kept accounts
+# outside Europe and the Americas from signing in. Tried in this order, most
+# widely available first, so the common case still hits on the first attempt.
+LB_CANDIDATES = ("8", "5", "4", "1", "3", "7", "6", "2", "9")
+
+# Regions observed to answer the login protocol. The field is free text in the
+# config flow, so an unlisted region still works if one appears later; this is
+# only the search order used when hunting for an account's home server.
+REGION_CANDIDATES = ("1", "2", "3", "4", "5", "6", "7", "8", "9")
+
+# The one login result whose meaning is confirmed as bad account/password. Note
+# that an account the server has never seen returns this too, so it cannot tell
+# "wrong password" from "no such account" - only that neither is the case.
+LOGIN_BAD_CREDENTIALS = "100100003"
+
+# Login result meaning "this account is not served by this regional server".
+# Confirmed by pointing a known-good account at the wrong region: its home
+# region returns 0 and a session, every other live region returns this.
+LOGIN_WRONG_REGION = "100101000"
 CLIENT_TYPE = "3"
 # Identifies this integration to the cloud. Deliberately not the phone app's own
 # client id: sharing one would put both on the same session.

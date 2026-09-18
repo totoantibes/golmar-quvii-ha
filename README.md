@@ -135,14 +135,23 @@ automations and Siri Shortcuts like any button.
 
 ## Sign‑in fails although the app works
 
-Almost always the **Region id**. Accounts live on one regional server, and asking
-a different one about yours fails — it is not your password. The integration
-defaults to region 1 (Europe); **5, 6 and 7 also exist**, with 5 hosted in the
-Americas. Try them in the config flow before suspecting the credentials.
+**This should now sort itself out** — but the history is worth knowing, because
+it was the integration's fault.
 
-Only one server response is known to mean "wrong account or password"; anything
-else is now reported as a refusal, with the server's own code in the log, rather
-than blaming the credentials.
+Your account lives on exactly one of the vendor's regional servers, and asking
+any other one about it fails in a way that looks nothing like a routing problem.
+The integration used to assume a single server address, which did not exist for
+half the regions — so accounts outside Europe and the Americas could not sign in
+at all, and the error blamed the password.
+
+Sign‑in now finds the right server by itself and remembers it, so **leave
+`Region id` alone**. The first sign‑in may take a few seconds longer while it
+looks.
+
+If it still fails, the log names the server's own refusal code. Please
+[open an issue](https://github.com/totoantibes/golmar-quvii-ha/issues) with that
+code — it means your account is served somewhere this integration doesn't know
+about yet, which is worth fixing for everyone.
 
 If the account is a phone number, enter it with the country code exactly as the
 app shows it (e.g. `+34…`).

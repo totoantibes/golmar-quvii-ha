@@ -25,13 +25,16 @@ from .const import (
     CLIENT_SUFFIX,
     CLIENT_TYPE,
     DEFAULT_APP_ID,
-    DEFAULT_LB,
     DEFAULT_OEM_ID,
     DEFAULT_REGION,
+    LB_CANDIDATES,
+    LOGIN_BAD_CREDENTIALS,
+    LOGIN_WRONG_REGION,
     OAUTH_HOST_TEMPLATE,
     OAUTH_PATH,
     OPENAPI_CONTROL_PATH,
     OPENAPI_HOST_TEMPLATE,
+    REGION_CANDIDATES,
     TOKEN_DEFAULT_TTL,
     TOKEN_EXPIRY_MARGIN,
 )
@@ -58,11 +61,6 @@ class QuviiLoginRefused(QuviiCloudError):
     """
 
 
-# The one login result code whose meaning is confirmed: bad account/password.
-# Anything else is refused for a reason we cannot name, and says so.
-LOGIN_BAD_CREDENTIALS = "100100003"
-
-
 class QuviiDeviceNotRegistered(QuviiCloudError):
     """The panel is not reachable on the cloud control plane.
 
@@ -86,7 +84,7 @@ class QuviiCloud:
         region: str = DEFAULT_REGION,
         app_id: str = DEFAULT_APP_ID,
         oem_id: str = DEFAULT_OEM_ID,
-        lb: str = DEFAULT_LB,
+        lb: str | None = None,
     ) -> None:
         self._account = account
         self._pw = hashlib.sha256(password.encode()).hexdigest()
@@ -94,7 +92,22 @@ class QuviiCloud:
         self._app_id = app_id
         self._oem_id = oem_id
         self._client_id = f"003-{app_id}-{CLIENT_SUFFIX}"
-        self._url = _host(region, lb) + "/auth/user?jus_duplex=up"
+        self._lb = lb
+        # Set once a login succeeds, and reused from then on so the search runs
+        # at most once per session.
+        self.resolved_region: str = region
+        self._url: str | None = None
+
+    def _lb_candidates(self) -> tuple[str, ...]:
+        if not self._lb:
+            return LB_CANDIDATES
+        return (self._lb,) + tuple(x for x in LB_CANDIDATES if x != self._lb)
+
+    def _region_candidates(self) -> tuple[str, ...]:
+        """Configured region first, then the rest as fallbacks."""
+        return (self._region,) + tuple(
+            r for r in REGION_CANDIDATES if r != self._region
+        )
 
     def _client(self) -> str:
         return (f"<client><app>{self._app_id}</app><id>{self._client_id}</id>"
@@ -108,11 +121,79 @@ class QuviiCloud:
                 f'<content class="{content_class}">{inner}</content>'
                 f"<header>{hdr}</header></envelope>")
 
-    async def _post(self, session: aiohttp.ClientSession, body: str) -> str:
+    async def _post(self, session: aiohttp.ClientSession, body: str,
+                    url: str | None = None) -> str:
         async with session.post(
-            self._url, data=body.encode(), headers={"Content-Type": "application/xml"}
+            url or self._url, data=body.encode(),
+            headers={"Content-Type": "application/xml"},
         ) as resp:
             return await resp.text()
+
+    def _login_body(self, region: str) -> str:
+        inner = (f"<account>{self._account}</account><auth-code></auth-code>"
+                 f"<ip-region-id>{region}</ip-region-id>"
+                 f"<password>{self._pw}</password><auth-type>0</auth-type>")
+        return self._envelope(
+            "com.quvii.qvweb.userauth.bean.request.LoginReqContent",
+            inner, "login", 1)
+
+    async def _async_login(self, session: aiohttp.ClientSession) -> str:
+        """Sign in and return a session id, finding the right server if needed.
+
+        An account is served by exactly one regional server; every other live
+        region refuses it with LOGIN_WRONG_REGION. That makes the right region
+        discoverable rather than something the user has to guess, so a refusal
+        of that specific kind moves on to the next region instead of failing.
+
+        Which lb values exist differs per region, so each region is tried across
+        the candidates until one resolves - a host that does not exist is not
+        evidence about the account.
+        """
+        if self._url:
+            text = await self._post(session, self._login_body(self.resolved_region))
+            if sid := re.search(r"<session><id>([^<]+)</id>", text):
+                return sid.group(1)
+            # The remembered server stopped accepting us; fall through and look
+            # again rather than reporting a failure from a stale choice.
+            self._url = None
+
+        last_error: QuviiCloudError | None = None
+        for region in self._region_candidates():
+            for lb in self._lb_candidates():
+                url = _host(region, lb) + "/auth/user?jus_duplex=up"
+                try:
+                    text = await self._post(session, self._login_body(region), url)
+                except (aiohttp.ClientError, TimeoutError):
+                    continue  # no such host, or unreachable - try the next lb
+                if sid := re.search(r"<session><id>([^<]+)</id>", text):
+                    if region != self._region:
+                        _LOGGER.warning(
+                            "This account is served by region %s, not the "
+                            "configured region %s. Set Region id to %s to skip "
+                            "this search next time.",
+                            region, self._region, region,
+                        )
+                    self._url = url
+                    self.resolved_region = region
+                    return sid.group(1)
+                error = self._login_failure(text)
+                if isinstance(error, QuviiAuthError):
+                    # The credentials are wrong; no other server will disagree.
+                    raise error
+                last_error = error
+                if self._result_code(text) == LOGIN_WRONG_REGION:
+                    break  # live server, wrong one for this account
+        _LOGGER.warning(
+            "No Quvii regional server accepted this account (last refusal: %s). "
+            "Regions %s were tried. If the phone app signs in with the same "
+            "credentials, please report this - it means the account is served "
+            "somewhere this integration does not know about.",
+            last_error or "none reached",
+            ", ".join(self._region_candidates()),
+        )
+        raise last_error or QuviiCloudError(
+            "no Quvii server accepted the sign-in"
+        )
 
     async def async_get_devices(self) -> list[dict]:
         """Log in and return one dict per panel.
@@ -126,16 +207,8 @@ class QuviiCloud:
         async with aiohttp.ClientSession(
             cookie_jar=jar, headers={"User-Agent": "okhttp/4.9.1"}
         ) as session:
-            # 1) login
-            inner = (f"<account>{self._account}</account><auth-code></auth-code>"
-                     f"<ip-region-id>{self._region}</ip-region-id>"
-                     f"<password>{self._pw}</password><auth-type>0</auth-type>")
-            text = await self._post(session, self._envelope(
-                "com.quvii.qvweb.userauth.bean.request.LoginReqContent", inner, "login", 1))
-            sid = re.search(r"<session><id>([^<]+)</id>", text)
-            if not sid:
-                raise self._login_failure(text)
-            session_id = sid.group(1)
+            # 1) login (locates the account's home server on first use)
+            session_id = await self._async_login(session)
 
             # 2) get-device-list
             inner = ("<count>128</count><filter></filter>"
@@ -147,6 +220,11 @@ class QuviiCloud:
             return self._parse_devices(text)
 
     @staticmethod
+    def _result_code(text: str) -> str | None:
+        match = re.search(r"<result>(-?\d+)</result>", text)
+        return match.group(1) if match else None
+
+    @staticmethod
     def _login_failure(text: str) -> QuviiCloudError:
         """Classify a login response that came back without a session.
 
@@ -154,20 +232,20 @@ class QuviiCloud:
         credentials are wrong. Everything else is reported as a refusal carrying
         the server's own code - which is what lets someone on the wrong regional
         server find out that is what happened.
+
+        Deliberately silent: this runs once per server while hunting for the
+        account's home region, so logging here would emit a warning per region
+        tried. The caller reports once, after the search is over.
         """
-        match = re.search(r"<result>(-?\d+)</result>", text)
-        result = match.group(1) if match else None
+        result = QuviiCloud._result_code(text)
         if result == LOGIN_BAD_CREDENTIALS:
             return QuviiAuthError(f"account or password rejected (result={result})")
-        _LOGGER.warning(
-            "Cloud login was refused with result=%s. If the phone app signs in "
-            "with these credentials, the account may live on another region: the "
-            "Region id defaults to 1 (Europe), and 5, 6 and 7 also exist.",
-            result if result is not None else "unknown",
-        )
+        if result == LOGIN_WRONG_REGION:
+            return QuviiLoginRefused(
+                f"this server does not serve the account (result={result})"
+            )
         return QuviiLoginRefused(
-            f"the server refused the login (result={result or 'unknown'}); "
-            "if the app works with these credentials, check the Region id"
+            f"the server refused the login (result={result or 'unknown'})"
         )
 
     @staticmethod
@@ -256,6 +334,24 @@ class QuviiCloudControl:
         )
         self._token: str | None = None
         self._token_expires: float = 0.0
+
+    def set_region(self, region: str) -> None:
+        """Point at another region's servers.
+
+        The account plane discovers which region actually serves an account, and
+        the control plane has to follow it or the open command goes to a server
+        that has never heard of the panel. Any cached token belongs to the old
+        region, so it is dropped.
+        """
+        if region == self._region:
+            return
+        self._region = region
+        self._oauth_url = OAUTH_HOST_TEMPLATE.format(region=region) + OAUTH_PATH
+        self._control_url = (
+            OPENAPI_HOST_TEMPLATE.format(region=region) + OPENAPI_CONTROL_PATH
+        )
+        self._token = None
+        self._token_expires = 0.0
 
     @staticmethod
     def _payload_error(payload: object) -> int | None:

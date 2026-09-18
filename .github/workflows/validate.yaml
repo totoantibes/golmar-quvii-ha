@@ -41,3 +41,4 @@ jobs:
           pip install aiohttp
           python tests/test_button_logic.py
           python tests/test_coordinator_logic.py
+          python tests/test_region_discovery.py
