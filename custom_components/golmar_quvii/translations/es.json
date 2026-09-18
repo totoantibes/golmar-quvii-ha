@@ -3,13 +3,20 @@
     "step": {
       "user": {
         "title": "Cuenta Golmar / Quvii",
-        "description": "Inicia sesión con tu cuenta Golmar G2Call+ (u otra aplicación de portero basada en Quvii). Las credenciales se usan una sola vez para obtener la clave local de cada placa; la apertura de puertas es después 100 % local. Deja App ID / OEM ID tal cual para Golmar.",
+        "description": "Inicia sesión con tu cuenta Golmar G2Call+ (u otra aplicación de portero basada en Quvii). Las credenciales se usan para obtener la clave local de cada placa; la apertura de puertas es después local, salvo que elijas otra cosa más abajo. Deja App ID / OEM ID tal cual para Golmar.",
         "data": {
           "account": "Cuenta (correo o teléfono, ej. +34...)",
           "password": "Contraseña",
           "region": "ID de región (1 = Europa)",
           "app_id": "App ID (avanzado — Golmar = 4053)",
-          "oem_id": "OEM ID (avanzado — Golmar = G0053,A0053)"
+          "oem_id": "OEM ID (avanzado — Golmar = G0053,A0053)",
+          "unlock_mode": "Modo de apertura: local / auto / cloud",
+          "extra_hosts": "Direcciones de placas adicionales (opcional, separadas por comas)"
+        },
+        "data_description": {
+          "unlock_mode": "local = solo red local, lo más rápido y funciona sin Internet. cloud = envía la orden de apertura a través de los servidores de Quvii; necesario en placas cuyo firmware solo abre la interfaz local mientras la aplicación transmite vídeo. auto = intenta primero en local y recurre a la nube.",
+          "extra_hosts": "Solo hace falta si una placa no está en la misma subred que Home Assistant, por ejemplo en otra VLAN. La detección recorre la subred local automáticamente.",
+          "region": "ID de región: 1 es Europa (predeterminado). Si el inicio de sesión falla aunque la aplicación funcione con las mismas credenciales, tu cuenta puede estar en otro servidor regional: también existen 5, 6 y 7."
         }
       },
       "select": {
@@ -23,7 +30,8 @@
     "error": {
       "invalid_auth": "Cuenta o contraseña no válidas.",
       "cannot_connect": "No se pudo conectar con la nube de Quvii.",
-      "no_devices": "Inicio de sesión correcto, pero no se encontraron dispositivos en esta cuenta."
+      "no_devices": "Inicio de sesión correcto, pero no se encontraron dispositivos en esta cuenta.",
+      "login_refused": "El servidor rechazó el inicio de sesión, pero no por la cuenta o la contraseña. La causa más probable es un ID de región incorrecto: prueba 5, 6 o 7. El código del servidor está en el registro de Home Assistant."
     },
     "abort": {
       "already_configured": "Esta cuenta ya está configurada."
@@ -35,7 +43,13 @@
         "title": "Puertas a controlar",
         "description": "Actualiza qué placas y cerraduras aparecen como botones: haz que coincidan con lo que abres desde la aplicación oficial de Golmar. Solo los canales cableados a tu placa abren de verdad; desmarca el resto.",
         "data": {
-          "locks": "Puertas / cerraduras"
+          "locks": "Puertas / cerraduras",
+          "unlock_mode": "Modo de apertura: local / auto / cloud",
+          "extra_hosts": "Direcciones de placas adicionales (opcional, separadas por comas)"
+        },
+        "data_description": {
+          "unlock_mode": "local = solo red local, lo más rápido y funciona sin Internet. cloud = envía la orden de apertura a través de los servidores de Quvii; necesario en placas cuyo firmware solo abre la interfaz local mientras la aplicación transmite vídeo. auto = intenta primero en local y recurre a la nube.",
+          "extra_hosts": "Solo hace falta si una placa no está en la misma subred que Home Assistant, por ejemplo en otra VLAN."
         }
       }
     }

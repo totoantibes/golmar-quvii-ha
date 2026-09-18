@@ -13,7 +13,13 @@ import ssl
 
 import aiohttp
 
-from .const import CGI_SECURITY, CGI_USERNAME
+from .const import (
+    CGI_ENDPOINTS,
+    CGI_PATH,
+    CGI_SECURITY,
+    CGI_USERNAME,
+    FINGERPRINT_KEY,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -42,7 +48,11 @@ _SSL.verify_mode = ssl.CERT_NONE
 
 
 class QuviiLocalDevice:
-    """Local /tdkcgi controller for one panel."""
+    """Local CGI controller for one panel.
+
+    The CGI answers identically on https/443 and http/80, so which one a panel is
+    reachable on is discovered rather than assumed.
+    """
 
     def __init__(self, ip: str, authcode: str, port: int = 443) -> None:
         self.ip = ip
@@ -50,8 +60,12 @@ class QuviiLocalDevice:
         self.port = port
 
     @property
+    def scheme(self) -> str:
+        return "https" if self.port == 443 else "http"
+
+    @property
     def url(self) -> str:
-        return f"https://{self.ip}:{self.port}/tdkcgi"
+        return f"{self.scheme}://{self.ip}:{self.port}{CGI_PATH}"
 
     def _envelope(self, command: str, content: str = "") -> str:
         return ('<?xml version="1.0" encoding="utf-8"?><envelope><header>'
@@ -62,7 +76,8 @@ class QuviiLocalDevice:
     async def _post(self, session: aiohttp.ClientSession, command: str, content: str = "") -> str:
         async with session.post(
             self.url, data=self._envelope(command, content).encode(),
-            headers={"Content-Type": "text/xml"}, ssl=_SSL,
+            headers={"Content-Type": "text/xml"},
+            ssl=_SSL if self.scheme == "https" else None,
             timeout=aiohttp.ClientTimeout(total=8),
         ) as resp:
             return await resp.text()
@@ -132,6 +147,35 @@ class QuviiLocalDevice:
         return locks
 
 
+async def async_is_panel(session: aiohttp.ClientSession, ip: str, port: int) -> bool:
+    """Is there a Quvii CGI at this address, without presenting the real key?
+
+    A panel replies to a junk key with an <error>401</error> envelope; unrelated
+    web servers 404 or drop the connection. Sweeping first with the junk key means
+    the panel's real access key is only ever sent to hosts already known to be
+    panels - a /24 typically has a dozen hosts listening on port 80 and none of
+    them should see the key to your front door.
+    """
+    probe = QuviiLocalDevice(ip, FINGERPRINT_KEY, port)
+    try:
+        return probe._error(await probe._post(session, "get.device.status")) is not None
+    except (aiohttp.ClientError, asyncio.TimeoutError, OSError):
+        return False
+
+
+def normalise_endpoint(value: object) -> dict | None:
+    """Normalise a stored address.
+
+    Before 0.6 only an IP was kept, because only https/443 was ever tried; those
+    entries are read back as that port so an upgrade does not lose the panel.
+    """
+    if isinstance(value, str) and value:
+        return {"ip": value, "port": 443}
+    if isinstance(value, dict) and value.get("ip"):
+        return {"ip": value["ip"], "port": int(value.get("port", 443))}
+    return None
+
+
 def _local_subnet_prefix() -> str | None:
     """Best-effort /24 prefix of the host's primary LAN address."""
     try:
@@ -144,50 +188,90 @@ def _local_subnet_prefix() -> str | None:
         return None
 
 
-async def async_verify_ip(ip: str, umid: str, authcode: str) -> bool:
-    """Confirm a known IP still answers as this panel.
+async def async_verify_ip(ip: str, umid: str, authcode: str, port: int = 443) -> bool:
+    """Confirm a known address still answers as this panel.
 
-    One request to one host, so this is cheap enough to run on every refresh -
-    unlike async_discover_ips, which sweeps the whole /24.
+    One host, so this is cheap enough to run on every refresh - unlike
+    async_discover_ips, which sweeps the whole /24. The fingerprint runs first:
+    a cached address can have been handed to a different machine by DHCP, and
+    that machine must not be sent the key.
     """
     async with aiohttp.ClientSession() as session:
-        return await QuviiLocalDevice(ip, authcode).async_get_umid(session) == umid
+        if not await async_is_panel(session, ip, port):
+            return False
+        return await QuviiLocalDevice(ip, authcode, port).async_get_umid(session) == umid
 
 
-async def async_discover_ips(devices_by_authcode: dict[str, str]) -> dict[str, str]:
-    """Scan the local /24 for /tdkcgi responders and match umids.
+async def _open_port(host: str, port: int, sem: asyncio.Semaphore) -> str | None:
+    async with sem:
+        try:
+            fut = asyncio.open_connection(host, port)
+            _reader, writer = await asyncio.wait_for(fut, timeout=DISCOVERY_CONNECT_TIMEOUT)
+            writer.close()
+            return host
+        except (OSError, asyncio.TimeoutError):
+            return None
+
+
+async def _match_hosts(
+    session: aiohttp.ClientSession,
+    hosts: list[str],
+    port: int,
+    wanted: dict[str, str],
+    found: dict[str, dict],
+) -> None:
+    """Identify which of `hosts` are panels we are looking for, on `port`."""
+    for host in hosts:
+        if len(found) == len(wanted):
+            return
+        if not await async_is_panel(session, host, port):
+            continue
+        for umid, authcode in wanted.items():
+            if umid in found:
+                continue
+            if await QuviiLocalDevice(host, authcode, port).async_get_umid(session) == umid:
+                found[umid] = {"ip": host, "port": port}
+                break
+
+
+async def async_discover_ips(
+    devices_by_authcode: dict[str, str], extra_hosts: list[str] | None = None
+) -> dict[str, dict]:
+    """Locate each panel on the network.
 
     devices_by_authcode: {umid: authcode}
-    returns {umid: ip} for the ones found.
+    returns {umid: {"ip": str, "port": int}} for the ones found.
+
+    Addresses in `extra_hosts` are tried first and are not restricted to Home
+    Assistant's own subnet, which is the only way to reach a panel that lives on
+    a separate VLAN. The /24 sweep then runs on 443, and only falls back to 80 if
+    panels are still missing: on a typical home LAN a handful of hosts listen on
+    443 and many more on 80, so trying 443 first keeps the work small.
     """
-    prefix = _local_subnet_prefix()
-    if not prefix:
-        return {}
-    # 1) find hosts with tcp 443 open (fast, concurrent)
+    found: dict[str, dict] = {}
     sem = asyncio.Semaphore(DISCOVERY_CONCURRENCY)
+    prefix = _local_subnet_prefix()
 
-    async def _open443(host: str) -> str | None:
-        async with sem:
-            try:
-                fut = asyncio.open_connection(host, 443)
-                reader, writer = await asyncio.wait_for(fut, timeout=DISCOVERY_CONNECT_TIMEOUT)
-                writer.close()
-                return host
-            except (OSError, asyncio.TimeoutError):
-                return None
-
-    hosts = [f"{prefix}.{i}" for i in range(1, 255)]
-    open_hosts = [h for h in await asyncio.gather(*[_open443(h) for h in hosts]) if h]
-
-    # 2) for each open host, try each unmatched authcode -> umid
-    found: dict[str, str] = {}
     async with aiohttp.ClientSession() as session:
-        for host in open_hosts:
-            for umid, authcode in devices_by_authcode.items():
-                if umid in found:
-                    continue
-                got = await QuviiLocalDevice(host, authcode).async_get_umid(session)
-                if got == umid:
-                    found[umid] = host
-                    break
+        for host in extra_hosts or []:
+            if len(found) == len(devices_by_authcode):
+                break
+            for port, _scheme in CGI_ENDPOINTS:
+                await _match_hosts(session, [host], port, devices_by_authcode, found)
+
+        if prefix is None:
+            if not found:
+                _LOGGER.debug("No local subnet to sweep and no extra hosts matched")
+            return found
+
+        hosts = [f"{prefix}.{i}" for i in range(1, 255)]
+        for port, _scheme in CGI_ENDPOINTS:
+            if len(found) == len(devices_by_authcode):
+                break
+            open_hosts = [
+                h for h in await asyncio.gather(*[_open_port(h, port, sem) for h in hosts]) if h
+            ]
+            _LOGGER.debug("Sweep of %s.0/24 port %s: %s host(s) listening",
+                          prefix, port, len(open_hosts))
+            await _match_hosts(session, open_hosts, port, devices_by_authcode, found)
     return found

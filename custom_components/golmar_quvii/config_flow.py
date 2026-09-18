@@ -4,7 +4,6 @@ from __future__ import annotations
 from typing import Any
 
 import voluptuous as vol
-
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -15,23 +14,35 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .cloud import QuviiAuthError, QuviiCloud, QuviiCloudError
+from .cloud import QuviiAuthError, QuviiCloud, QuviiCloudError, QuviiLoginRefused
 from .const import (
     CONF_ACCOUNT,
     CONF_APP_ID,
+    CONF_EXTRA_HOSTS,
     CONF_LOCKS,
     CONF_OEM_ID,
     CONF_PASSWORD,
     CONF_REGION,
+    CONF_UNLOCK_MODE,
     DEFAULT_APP_ID,
     DEFAULT_LOCKS,
     DEFAULT_OEM_ID,
     DEFAULT_REGION,
+    DEFAULT_UNLOCK_MODE,
     DOMAIN,
+    MODE_CLOUD,
+    UNLOCK_MODES,
 )
 from .device import QuviiLocalDevice, async_discover_ips
 
 _LOCK_FIELDS = ("umid", "door", "lock", "name")
+# options the user sets on the first screen but that live in entry.options, so
+# they stay editable afterwards without reconfiguring the account
+_OPTION_KEYS = (CONF_UNLOCK_MODE, CONF_EXTRA_HOSTS)
+
+
+def _split_hosts(raw: str | None) -> list[str]:
+    return [h.strip() for h in (raw or "").replace(";", ",").split(",") if h.strip()]
 
 
 def _fallback_catalog(umid: str, name: str, catalog: dict[str, dict]) -> None:
@@ -52,24 +63,38 @@ def _add_locks(umid: str, name: str, locks: list[dict], catalog: dict[str, dict]
         }
 
 
-async def _discover_catalog(hass: HomeAssistant, devices: list[dict]) -> dict[str, dict]:
-    """Scan the LAN and list each panel's real door/lock relays.
+async def _discover_catalog(
+    hass: HomeAssistant,
+    devices: list[dict],
+    extra_hosts: list[str] | None = None,
+    skip_discovery: bool = False,
+) -> dict[str, dict]:
+    """Scan the network and list each panel's real door/lock relays.
 
     Returns {"umid:door:lock": {umid,door,lock,name,label,enabled}}. Panels that
     can't be reached fall back to the static DEFAULT_LOCKS so the user can still
     pick something and refine later via the options flow.
+
+    skip_discovery is set for cloud mode, which never contacts the panel over the
+    network: sweeping would only delay setup, and the panels that need cloud mode
+    are precisely the ones a sweep cannot find.
     """
     names = {d["umid"]: (d.get("name") or d["umid"]) for d in devices}
     by_auth = {d["umid"]: d["authcode"] for d in devices}
-    try:
-        ips = await async_discover_ips(by_auth)
-    except Exception:  # noqa: BLE001 - discovery is best-effort
-        ips = {}
+    if skip_discovery:
+        endpoints: dict[str, dict] = {}
+    else:
+        try:
+            endpoints = await async_discover_ips(by_auth, extra_hosts)
+        except Exception:  # noqa: BLE001 - discovery is best-effort
+            endpoints = {}
 
     catalog: dict[str, dict] = {}
     session = async_get_clientsession(hass)
-    for umid, ip in ips.items():
-        locks = await QuviiLocalDevice(ip, by_auth[umid]).async_get_locks(session)
+    for umid, endpoint in endpoints.items():
+        locks = await QuviiLocalDevice(
+            endpoint["ip"], by_auth[umid], endpoint["port"]
+        ).async_get_locks(session)
         _add_locks(umid, names[umid], locks, catalog)
     for umid, name in names.items():
         if not any(k.startswith(f"{umid}:") for k in catalog):
@@ -98,6 +123,7 @@ class GolmarQuviiConfigFlow(ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
+        self._options: dict[str, Any] = {}
         self._catalog: dict[str, dict] = {}
 
     @staticmethod
@@ -121,6 +147,10 @@ class GolmarQuviiConfigFlow(ConfigFlow, domain=DOMAIN):
                 devices = await cloud.async_get_devices()
             except QuviiAuthError:
                 errors["base"] = "invalid_auth"
+            except QuviiLoginRefused:
+                # Refused, but not for the credentials - most often the account
+                # lives on a different regional server than the one asked.
+                errors["base"] = "login_refused"
             except QuviiCloudError:
                 errors["base"] = "cannot_connect"
             else:
@@ -129,8 +159,17 @@ class GolmarQuviiConfigFlow(ConfigFlow, domain=DOMAIN):
                 else:
                     await self.async_set_unique_id(user_input[CONF_ACCOUNT])
                     self._abort_if_unique_id_configured()
-                    self._data = user_input
-                    self._catalog = await _discover_catalog(self.hass, devices)
+                    self._data = {k: v for k, v in user_input.items() if k not in _OPTION_KEYS}
+                    mode = user_input.get(CONF_UNLOCK_MODE, DEFAULT_UNLOCK_MODE)
+                    self._options = {
+                        CONF_UNLOCK_MODE: mode,
+                        CONF_EXTRA_HOSTS: user_input.get(CONF_EXTRA_HOSTS, ""),
+                    }
+                    self._catalog = await _discover_catalog(
+                        self.hass, devices,
+                        _split_hosts(user_input.get(CONF_EXTRA_HOSTS)),
+                        skip_discovery=mode == MODE_CLOUD,
+                    )
                     return await self.async_step_select()
 
         # Defaults = Golmar G2Call+. Other Quvii-SDK brands override app_id / oem_id.
@@ -141,6 +180,10 @@ class GolmarQuviiConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Optional(CONF_REGION, default=DEFAULT_REGION): str,
                 vol.Optional(CONF_APP_ID, default=DEFAULT_APP_ID): str,
                 vol.Optional(CONF_OEM_ID, default=DEFAULT_OEM_ID): str,
+                vol.Optional(CONF_UNLOCK_MODE, default=DEFAULT_UNLOCK_MODE): vol.In(
+                    UNLOCK_MODES
+                ),
+                vol.Optional(CONF_EXTRA_HOSTS, default=""): str,
             }
         )
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
@@ -153,7 +196,7 @@ class GolmarQuviiConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(
                 title=f"Quvii ({self._data[CONF_ACCOUNT]})",
                 data=self._data,
-                options={CONF_LOCKS: locks},
+                options={**self._options, CONF_LOCKS: locks},
             )
         return self.async_show_form(
             step_id="select", data_schema=_selection_schema(self._catalog, [])
@@ -169,20 +212,34 @@ class GolmarQuviiOptionsFlow(OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
+        options = self.config_entry.options
         if user_input is not None:
             if not self._catalog:  # defensive: rebuild if instance was recreated
                 self._catalog = await self._build_catalog()
             locks = _locks_from_keys(self._catalog, user_input.get(CONF_LOCKS, []))
-            return self.async_create_entry(title="", data={CONF_LOCKS: locks})
+            return self.async_create_entry(title="", data={
+                CONF_LOCKS: locks,
+                CONF_UNLOCK_MODE: user_input.get(CONF_UNLOCK_MODE, DEFAULT_UNLOCK_MODE),
+                CONF_EXTRA_HOSTS: user_input.get(CONF_EXTRA_HOSTS, ""),
+            })
 
         self._catalog = await self._build_catalog()
         current = [
             f"{x['umid']}:{x['door']}:{x['lock']}"
-            for x in self.config_entry.options.get(CONF_LOCKS, [])
+            for x in options.get(CONF_LOCKS, [])
         ]
-        return self.async_show_form(
-            step_id="init", data_schema=_selection_schema(self._catalog, current)
+        schema = _selection_schema(self._catalog, current).extend(
+            {
+                vol.Optional(
+                    CONF_UNLOCK_MODE,
+                    default=options.get(CONF_UNLOCK_MODE, DEFAULT_UNLOCK_MODE),
+                ): vol.In(UNLOCK_MODES),
+                vol.Optional(
+                    CONF_EXTRA_HOSTS, default=options.get(CONF_EXTRA_HOSTS, "")
+                ): str,
+            }
         )
+        return self.async_show_form(step_id="init", data_schema=schema)
 
     async def _build_catalog(self) -> dict[str, dict]:
         """Build the catalog from the running coordinator (no LAN re-scan)."""
