@@ -140,6 +140,9 @@ class GolmarQuviiCoordinator(DataUpdateCoordinator):
             return self._cloud_devices
         try:
             self._cloud_devices = await self.cloud.async_get_devices()
+            # The account plane may have found the account on a different region
+            # than the one configured; the control plane has to follow it.
+            self.cloud_control.set_region(self.cloud.resolved_region)
         except QuviiAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except QuviiCloudError as err:

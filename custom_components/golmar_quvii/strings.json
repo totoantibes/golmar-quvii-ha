@@ -7,7 +7,7 @@
         "data": {
           "account": "Account (email or phone, e.g. +33...)",
           "password": "Password",
-          "region": "Region id (1 = Europe)",
+          "region": "Region id (advanced — detected automatically)",
           "app_id": "App ID (advanced — Golmar = 4053)",
           "oem_id": "OEM ID (advanced — Golmar = G0053,A0053)",
           "unlock_mode": "How to open doors: local / auto / cloud",
@@ -16,7 +16,7 @@
         "data_description": {
           "unlock_mode": "local = LAN only, fastest and works without internet. cloud = send the open command through the Quvii servers; needed by panels whose firmware only opens the local interface while the app is streaming video. auto = try local first, fall back to cloud.",
           "extra_hosts": "Only needed if a panel is not on Home Assistant's own subnet — for example on a separate VLAN. Discovery scans the local subnet automatically.",
-          "region": "Region id — 1 is Europe (the default). If sign-in fails even though the phone app works with the same credentials, your account may live on another regional server: 5, 6 and 7 also exist."
+          "region": "Leave this alone. Sign-in finds the regional server that actually holds your account and remembers it, so this only matters as a starting point for that search."
         }
       },
       "select": {
@@ -31,7 +31,7 @@
       "invalid_auth": "Invalid account or password.",
       "cannot_connect": "Could not reach the Quvii cloud.",
       "no_devices": "Login worked but no devices were found on this account.",
-      "login_refused": "The server refused the sign-in, but not because of the account or password. The most likely cause is the wrong Region id — try 5, 6 or 7. The server's own code is in the Home Assistant log."
+      "login_refused": "No Quvii regional server recognised this account, and the refusal was not about the account or password. The server's own code is in the Home Assistant log — please report it on GitHub, because it means your account is served somewhere this integration does not know about."
     },
     "abort": {
       "already_configured": "This account is already configured."

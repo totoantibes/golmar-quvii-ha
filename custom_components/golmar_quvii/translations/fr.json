@@ -7,7 +7,7 @@
         "data": {
           "account": "Compte (e-mail ou téléphone, ex. +33...)",
           "password": "Mot de passe",
-          "region": "Identifiant de région (1 = Europe)",
+          "region": "Identifiant de région (avancé — détecté automatiquement)",
           "app_id": "App ID (avancé — Golmar = 4053)",
           "oem_id": "OEM ID (avancé — Golmar = G0053,A0053)",
           "unlock_mode": "Mode d'ouverture : local / auto / cloud",
@@ -16,7 +16,7 @@
         "data_description": {
           "unlock_mode": "local = réseau local uniquement, le plus rapide et fonctionne sans Internet. cloud = envoie la commande d'ouverture via les serveurs Quvii ; nécessaire pour les platines dont le micrologiciel n'ouvre l'interface locale que pendant la diffusion vidéo de l'application. auto = essaie d'abord en local, puis bascule sur le cloud.",
           "extra_hosts": "Utile uniquement si une platine n'est pas sur le même sous-réseau que Home Assistant — par exemple sur un VLAN séparé. La détection balaie automatiquement le sous-réseau local.",
-          "region": "Identifiant de région : 1 correspond à l'Europe (par défaut). Si la connexion échoue alors que l'application fonctionne avec les mêmes identifiants, votre compte se trouve peut-être sur un autre serveur régional : 5, 6 et 7 existent aussi."
+          "region": "Laissez ce champ tel quel. La connexion recherche le serveur régional qui héberge réellement votre compte et le mémorise ; cette valeur ne sert que de point de départ à cette recherche."
         }
       },
       "select": {
@@ -31,7 +31,7 @@
       "invalid_auth": "Compte ou mot de passe invalide.",
       "cannot_connect": "Impossible de joindre le cloud Quvii.",
       "no_devices": "Connexion réussie, mais aucun appareil trouvé sur ce compte.",
-      "login_refused": "Le serveur a refusé la connexion, mais pas à cause du compte ou du mot de passe. La cause la plus probable est un identifiant de région incorrect : essayez 5, 6 ou 7. Le code renvoyé par le serveur figure dans le journal de Home Assistant."
+      "login_refused": "Aucun serveur régional Quvii n'a reconnu ce compte, et le refus ne concerne ni le compte ni le mot de passe. Le code renvoyé par le serveur figure dans le journal de Home Assistant : merci de le signaler sur GitHub, car cela signifie que votre compte est hébergé sur un serveur inconnu de cette intégration."
     },
     "abort": {
       "already_configured": "Ce compte est déjà configuré."

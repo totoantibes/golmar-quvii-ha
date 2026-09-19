@@ -160,6 +160,10 @@ class GolmarQuviiConfigFlow(ConfigFlow, domain=DOMAIN):
                     await self.async_set_unique_id(user_input[CONF_ACCOUNT])
                     self._abort_if_unique_id_configured()
                     self._data = {k: v for k, v in user_input.items() if k not in _OPTION_KEYS}
+                    # Sign-in locates the account's real regional server, which
+                    # may not be the one chosen. Store what worked so the search
+                    # is not repeated on every future refresh.
+                    self._data[CONF_REGION] = cloud.resolved_region
                     mode = user_input.get(CONF_UNLOCK_MODE, DEFAULT_UNLOCK_MODE)
                     self._options = {
                         CONF_UNLOCK_MODE: mode,
