@@ -10,7 +10,9 @@ is streaming video, which leaves nothing on the LAN to talk to. Those panels can
 opt into a **cloud unlock** path instead — see
 [How doors are opened](#how-doors-are-opened). Local remains the default.
 
-> **Tested with:** Golmar G2Call+ (`ART7W‑G2+`).
+> **Tested with:** Golmar G2Call+ (`ART7W‑G2+`) and the Wi‑Fi
+> `ART 4W LITE/G2+` in `cloud` mode (reported by the integration as
+> `ART4HW/G2+`).
 > Golmar is one of several brands built on the **Quvii** platform, so other
 > Quvii‑based intercom apps *may* work by setting the App ID / OEM ID in the
 > config flow — see [Other Quvii brands](#other-quvii-brands). Only Golmar is
@@ -46,8 +48,12 @@ opt into a **cloud unlock** path instead — see
 
 **Supported hardware:** any G2Call+‑compatible Golmar **Wi‑Fi** monitor *should*
 work — chiefly the **ART 7W** (Art 7 Wi‑Fi) and **SOUL** Wi‑Fi families.
-**Tested / confirmed:** `ART7W‑G2+`. Other models are untested candidates —
-please report what works (or doesn't) so this list can grow.
+**Tested / confirmed:** `ART7W‑G2+`; and the
+[Wi‑Fi `ART 4W LITE/G2+`](https://www.golmar.es/products/art-4w-lite-g2-plus)
+in `cloud` mode, where it appears as `ART4HW/G2+`. On the latter installation,
+`Door 1 Lock 1`, `Door 1 Lock 2`, and `Door 2 Lock 1` have been verified to
+work. Other models are untested candidates — please report what works (or
+doesn't) so this list can grow.
 
 ## How it works
 
@@ -84,15 +90,16 @@ short‑lived **dynamic password** per panel (it expires in days, so the device
 list is renewed before each expiry rather than monthly) and an **OAuth token**
 valid for one hour, minted on demand and cached.
 
-> **Cloud unlock is confirmed working on affected hardware by a contributor**
-> (both doors, reliably — thanks @victor-marino), but **not by the author**: this
+> **Cloud unlock is confirmed working on affected hardware by contributors**
+> (thanks @victor-marino), but **not by the author**: this
 > project's own panel is not registered on the vendor's control plane at all, so
-> every cloud open on it returns *device not registered*. Treat it as tested by
-> one person on one panel rather than broadly proven, and please report how it
-> behaves on yours.
+> every cloud open on it returns *device not registered*. Treat these as reports
+> from individual installations rather than broadly proven compatibility, and
+> please report how it behaves on yours.
 >
-> Two limits worth knowing. Only `door 1` locks 1 and 2 have been exercised over
-> the cloud; higher channels (the `General Panel N` street entrances) are
+> Two limits worth knowing. Cloud opening has been verified for `Door 1 Lock 1`,
+> `Door 1 Lock 2`, and `Door 2 Lock 1` on the Wi‑Fi `ART 4W LITE/G2+` installation
+> above. Other channels, including `General Panel N` street entrances, remain
 > untested on this path. And the OAuth and control hosts are region‑scoped, but
 > only region 1 has ever been contacted.
 
