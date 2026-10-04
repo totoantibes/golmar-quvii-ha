@@ -93,8 +93,9 @@ valid for one hour, minted on demand and cached.
 >
 > Two limits worth knowing. Only `door 1` locks 1 and 2 have been exercised over
 > the cloud; higher channels (the `General Panel N` street entrances) are
-> untested on this path. And the OAuth and control hosts are region‑scoped, but
-> only region 1 has ever been contacted.
+> untested on this path. The OAuth and control hosts follow whichever region
+> actually holds your account, which contributors have since exercised beyond
+> region 1.
 
 ## Install
 
@@ -186,8 +187,12 @@ just pick it. (App ID / OEM ID are app‑specific values; region `1` = Europe.)
 - **`cloud_available` on a button means a dynamic password is cached** for that
   panel, i.e. the cloud path is configured. It is not a statement that the
   token, the credential and the vendor's service have been checked and work.
-- The number of doors/locks isn't reported, so four buttons are created per
-  panel; disable the ones you don't use.
+- **Which doors you're offered depends on whether the panel can be asked.**
+  Reachable panels are enumerated directly and report their real channel names.
+  Otherwise you get every channel a panel can address — `Door 1`–`Door 4` and
+  `General Panel 1`–`4`, two lock relays each — and tick the ones you have.
+  Channels not wired to your panel accept the command and do nothing, so leaving
+  them unticked keeps the buttons clean.
 - **Security:** see the ⚠️ warning at the top — anyone on your LAN who has the
   key can open the doors, and cloud mode widens that further. Keep it on a
   trusted, segmented network.

@@ -93,17 +93,34 @@ CGI_ENDPOINTS = ((443, "https"), (80, "http"))
 # is what keeps the real key away from unrelated hosts during a sweep.
 FINGERPRINT_KEY = "0" * 64
 
-# Default lock buttons created per device: (door/channel, locknumber, label).
-# "door" is the panel/channel number as reported by get.device.attachInfo:
-# channels 1-4 are the block door panels ("Door N"), channels 9-12 are the
-# general/street panels ("General Panel N"). Each panel exposes two lock relays.
-# A device only actuates the channels physically wired to its bus; the others
-# accept the command but do nothing.
+# The channels a panel can address, as get.device.attachInfo reports them on a
+# real device: four block door panels ("Door N") and four general/street panels
+# ("General Panel N"), each with two lock relays.
+#
+# Channels 5-8 and 13-16 exist as well but are CCTV inputs - they carry no lock,
+# so a button for them can never open anything. Guessing that the door channels
+# run 1..8 is the natural mistake and produces buttons that silently do nothing.
+DOOR_CHANNELS = (1, 2, 3, 4)
+GENERAL_PANEL_CHANNELS = (9, 10, 11, 12)
+LOCKS_PER_CHANNEL = (1, 2)
+
+# Offered when the panel cannot be asked what it actually has - which is always
+# the case in cloud mode, since enumeration needs the local interface those
+# panels do not expose. It covers every channel a panel can address rather than
+# a handful, because anything missing here is unreachable from the UI: the only
+# workaround is editing this file, which the next update overwrites.
+#
+# A device only actuates channels physically wired to its bus; the rest accept
+# the command and do nothing. Leaving them unticked keeps the buttons clean.
 DEFAULT_LOCKS = [
-    (1, 1, "Door 1 Lock 1"),
-    (1, 2, "Door 1 Lock 2"),
-    (2, 1, "Door 2 Lock 1"),
-    (2, 2, "Door 2 Lock 2"),
-    (9, 1, "General Panel 1 Lock 1"),
-    (9, 2, "General Panel 1 Lock 2"),
+    *(
+        (channel, lock, f"Door {position} Lock {lock}")
+        for position, channel in enumerate(DOOR_CHANNELS, 1)
+        for lock in LOCKS_PER_CHANNEL
+    ),
+    *(
+        (channel, lock, f"General Panel {position} Lock {lock}")
+        for position, channel in enumerate(GENERAL_PANEL_CHANNELS, 1)
+        for lock in LOCKS_PER_CHANNEL
+    ),
 ]

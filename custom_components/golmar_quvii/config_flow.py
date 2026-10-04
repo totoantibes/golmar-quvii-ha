@@ -14,7 +14,13 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .cloud import QuviiAuthError, QuviiCloud, QuviiCloudError, QuviiLoginRefused
+from .cloud import (
+    QuviiAuthError,
+    QuviiCloud,
+    QuviiCloudControl,
+    QuviiCloudError,
+    QuviiLoginRefused,
+)
 from .const import (
     CONF_ACCOUNT,
     CONF_APP_ID,
@@ -30,6 +36,7 @@ from .const import (
     DEFAULT_REGION,
     DEFAULT_UNLOCK_MODE,
     DOMAIN,
+    MODE_AUTO,
     MODE_CLOUD,
     UNLOCK_MODES,
 )
@@ -68,12 +75,16 @@ async def _discover_catalog(
     devices: list[dict],
     extra_hosts: list[str] | None = None,
     skip_discovery: bool = False,
+    cloud_control=None,
 ) -> dict[str, dict]:
-    """Scan the network and list each panel's real door/lock relays.
+    """List each panel's real door/lock relays, by whatever route reaches it.
 
-    Returns {"umid:door:lock": {umid,door,lock,name,label,enabled}}. Panels that
-    can't be reached fall back to the static DEFAULT_LOCKS so the user can still
-    pick something and refine later via the options flow.
+    Returns {"umid:door:lock": {umid,door,lock,name,label,enabled}}.
+
+    Three sources, in descending order of trust: the panel over the LAN, the
+    panel through the cloud, and - for anything still unknown - the static set of
+    channels a panel can address. The static set is a guess about one
+    installation, so it is used last and never in preference to asking.
 
     skip_discovery is set for cloud mode, which never contacts the panel over the
     network: sweeping would only delay setup, and the panels that need cloud mode
@@ -96,6 +107,22 @@ async def _discover_catalog(
             endpoint["ip"], by_auth[umid], endpoint["port"]
         ).async_get_locks(session)
         _add_locks(umid, names[umid], locks, catalog)
+
+    # Ask the cloud about any panel the LAN could not describe. This is the only
+    # route for a panel that never exposes a local interface, and without it
+    # those installations are stuck with whatever the static set happens to
+    # contain - which cost one user their doors 3 and 4 entirely.
+    if cloud_control is not None:
+        for device in devices:
+            umid = device["umid"]
+            if any(k.startswith(f"{umid}:") for k in catalog):
+                continue
+            locks = await cloud_control.async_get_locks(
+                session, umid, device.get("dynamic_password") or ""
+            )
+            if locks:
+                _add_locks(umid, names[umid], locks, catalog)
+
     for umid, name in names.items():
         if not any(k.startswith(f"{umid}:") for k in catalog):
             _fallback_catalog(umid, name, catalog)
@@ -169,10 +196,23 @@ class GolmarQuviiConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_UNLOCK_MODE: mode,
                         CONF_EXTRA_HOSTS: user_input.get(CONF_EXTRA_HOSTS, ""),
                     }
+                    # Cloud modes can ask the panel about itself even with no
+                    # LAN route to it. Built on the region sign-in actually
+                    # landed on, not the one that was typed.
+                    control = None
+                    if mode in (MODE_CLOUD, MODE_AUTO):
+                        control = QuviiCloudControl(
+                            user_input[CONF_ACCOUNT],
+                            user_input[CONF_PASSWORD],
+                            cloud.resolved_region,
+                            user_input.get(CONF_APP_ID, DEFAULT_APP_ID),
+                            user_input.get(CONF_OEM_ID, DEFAULT_OEM_ID),
+                        )
                     self._catalog = await _discover_catalog(
                         self.hass, devices,
                         _split_hosts(user_input.get(CONF_EXTRA_HOSTS)),
                         skip_discovery=mode == MODE_CLOUD,
+                        cloud_control=control,
                     )
                     return await self.async_step_select()
 
@@ -255,7 +295,19 @@ class GolmarQuviiOptionsFlow(OptionsFlow):
             name = (coordinator.data.get(umid) or {}).get("name") or umid
             locks = await dev.async_get_locks(session)
             _add_locks(umid, name, locks, catalog)
-        # panels the cloud lists but that are unreachable now -> static default set
+        # Panels with no LAN route can still describe themselves through the
+        # cloud. Without this, reopening the options on a cloud-only install
+        # would keep offering the static set however many doors it really has.
+        if coordinator.unlock_mode in (MODE_CLOUD, MODE_AUTO):
+            for umid, info in (coordinator.data or {}).items():
+                if any(k.startswith(f"{umid}:") for k in catalog):
+                    continue
+                locks = await coordinator.cloud_control.async_get_locks(
+                    session, umid, info.get("dynamic_password") or ""
+                )
+                if locks:
+                    _add_locks(umid, info.get("name") or umid, locks, catalog)
+        # panels nothing could describe -> static set of addressable channels
         for umid, info in (coordinator.data or {}).items():
             if not any(k.startswith(f"{umid}:") for k in catalog):
                 _fallback_catalog(umid, info.get("name") or umid, catalog)
