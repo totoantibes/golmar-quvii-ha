@@ -180,6 +180,26 @@ flow.
 If you get another brand working, please open a PR to add a row so others can
 just pick it. (App ID / OEM ID are app‑specific values; region `1` = Europe.)
 
+### Not every Quvii brand speaks this protocol
+
+Quvii has an **older backend generation** — `umeye_api` — that this integration
+does not support at all. It is not a matter of different App ID / OEM ID values:
+it is a different wire protocol end to end, and no setting here will reach it.
+
+**Fermax Way‑Fi** is one such brand. @jdntortosa reverse‑engineered it and wrote
+a separate integration for it, using a direct LAN protocol on TCP 5801 that
+needs neither the cloud nor the vendor app:
+
+**[jdntortosa/fermax-wayfi-ha](https://github.com/jdntortosa/fermax-wayfi-ha)**
+
+That is the right place to go if your panel is on that family — their protocol
+notes live in
+[`protocol.py`](https://github.com/jdntortosa/fermax-wayfi-ha/blob/main/custom_components/wayfi/protocol.py).
+
+The two really are separate: a Golmar `ART7W-G2+` exposes nothing on 5801, 8888
+or 8300, and the Way‑Fi panels expose no `/tdkcgi`. Keeping them as two
+integrations means each is maintained by someone who can actually test it.
+
 ## Notes & limitations
 
 - **In `local` mode the panel must be reachable from Home Assistant.** If
