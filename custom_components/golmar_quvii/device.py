@@ -122,29 +122,54 @@ class QuviiLocalDevice:
             text = await self._post(session, "get.device.attachInfo")
         except (aiohttp.ClientError, asyncio.TimeoutError, OSError):
             return []
+        return parse_locks(text)
+
+
+def parse_locks(document: object) -> list[dict]:
+    """Turn a get.device.attachInfo reply into one entry per lock relay.
+
+    Returns {"door": <channel id>, "lock": <1-based relay>, "name", "enabled"},
+    with the channel names the official app shows ("Door1", "General Panel1").
+
+    Only camera-sub-type channels are kept. A panel also reports CCTV inputs and
+    lights, which carry no lock relay - a button for one of those can never open
+    anything, so they are not offered.
+
+    Accepts the raw body or an already-decoded document, because the same reply
+    arrives as text from the panel directly and as a nested JSON string when it
+    comes back through the cloud. Anything unparseable yields an empty list so
+    callers fall back to the static channel set.
+    """
+    if isinstance(document, (str, bytes)):
         try:
-            devlist = json.loads(text)["body"]["content"]["sub-devlist"]
-        except (ValueError, TypeError, KeyError):
+            document = json.loads(document)
+        except ValueError:
             return []
-        locks: list[dict] = []
-        for item in devlist:
-            # keep the real door-station channels only (type "chn", camera sub-type);
-            # CCTV inputs and lights carry no openable door.
-            if item.get("type") != "chn" or item.get("sub-type") != "cam":
-                continue
-            door = item.get("id")
-            if door is None:
-                continue
-            name = item.get("name") or f"Channel {door}"
-            relays = len(item.get("children") or []) or 2
-            for lock in range(1, relays + 1):
-                locks.append({
-                    "door": door,
-                    "lock": lock,
-                    "name": f"{name} Lock {lock}",
-                    "enabled": bool(item.get("enable", 1)),
-                })
-        return locks
+    try:
+        devlist = document["body"]["content"]["sub-devlist"]
+    except (TypeError, KeyError, IndexError):
+        return []
+    if not isinstance(devlist, list):
+        return []
+    locks: list[dict] = []
+    for item in devlist:
+        if not isinstance(item, dict):
+            continue
+        if item.get("type") != "chn" or item.get("sub-type") != "cam":
+            continue
+        door = item.get("id")
+        if door is None:
+            continue
+        name = item.get("name") or f"Channel {door}"
+        relays = len(item.get("children") or []) or 2
+        for lock in range(1, relays + 1):
+            locks.append({
+                "door": door,
+                "lock": lock,
+                "name": f"{name} Lock {lock}",
+                "enabled": bool(item.get("enable", 1)),
+            })
+    return locks
 
 
 async def async_is_panel(session: aiohttp.ClientSession, ip: str, port: int) -> bool:
