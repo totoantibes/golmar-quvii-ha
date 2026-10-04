@@ -38,6 +38,7 @@ from .const import (
     TOKEN_DEFAULT_TTL,
     TOKEN_EXPIRY_MARGIN,
 )
+from .device import parse_locks
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -440,6 +441,77 @@ class QuviiCloudControl:
             expiry - TOKEN_EXPIRY_MARGIN if expiry else time.time() + TOKEN_DEFAULT_TTL
         )
         return token
+
+    async def _async_command(
+        self,
+        session: aiohttp.ClientSession,
+        umid: str,
+        dynamic_password: str,
+        command: str,
+        content: dict,
+    ) -> dict:
+        """Send one command to a panel through the cloud and return the reply."""
+        token = await self._async_token(session)
+        payload = {
+            "deviceId": umid,
+            "password": dynamic_password,
+            "command": command,
+            "content": content,
+        }
+        try:
+            async with session.post(
+                self._control_url, json=payload,
+                headers={"token": token},
+                timeout=aiohttp.ClientTimeout(total=20),
+            ) as resp:
+                body = await resp.text()
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise QuviiCloudError(f"cloud command failed: {err}") from err
+        try:
+            return json.loads(body)
+        except ValueError:
+            raise QuviiCloudError(
+                "cloud command returned a non-JSON response"
+            ) from None
+
+    async def async_get_locks(
+        self, session: aiohttp.ClientSession, umid: str, dynamic_password: str
+    ) -> list[dict]:
+        """Enumerate a panel's door/lock relays without touching the LAN.
+
+        Cloud-mode panels expose no local interface, so the usual enumeration
+        cannot run and the caller otherwise falls back to a fixed channel set.
+        This asks the panel the same question through the cloud instead.
+
+        Best effort by design: anything unexpected returns an empty list and the
+        caller keeps its fallback, because a panel that will not describe itself
+        is still perfectly able to open doors.
+
+        Whether the control endpoint serves read commands at all is unverified -
+        the only panel available to test against is not registered on that plane
+        and refuses every command, including opens that work for other people.
+        """
+        if not dynamic_password:
+            return []
+        try:
+            doc = await self._async_command(
+                session, umid, dynamic_password, "get.device.attachInfo", {}
+            )
+        except QuviiCloudError as err:
+            _LOGGER.debug("Cloud channel enumeration failed for %s: %s", umid, err)
+            return []
+        if doc.get("result") != 0:
+            _LOGGER.debug(
+                "Cloud channel enumeration for %s refused: result=%s %s",
+                umid, doc.get("result"), doc.get("message") or "",
+            )
+            return []
+        locks = parse_locks(doc.get("payload"))
+        if not locks:
+            _LOGGER.debug(
+                "Cloud channel enumeration for %s returned nothing usable", umid
+            )
+        return locks
 
     async def async_open(
         self,

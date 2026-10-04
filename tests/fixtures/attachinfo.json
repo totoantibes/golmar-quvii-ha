@@ -1,0 +1,577 @@
+{
+  "body": {
+    "content": {
+      "profile": {
+        "chns": {
+          "total": 16,
+          "ability": {
+            "switchdirectly": 0
+          },
+          "catalogs": [
+            {
+              "type": "cam",
+              "total": 8
+            },
+            {
+              "type": "cctv",
+              "total": 8
+            },
+            {
+              "type": "ipg",
+              "total": 0
+            },
+            {
+              "type": "manage",
+              "total": 0
+            },
+            {
+              "type": "ep",
+              "total": 0
+            }
+          ]
+        },
+        "subs": {
+          "total": 33,
+          "catalogs": [
+            {
+              "type": "lock",
+              "total": 32,
+              "enable": 1
+            }
+          ]
+        }
+      },
+      "sub-devlist": [
+        {
+          "id": 1,
+          "code": "CAM1",
+          "name": "Door1",
+          "type": "chn",
+          "children": [
+            {
+              "code": "lock_chn1 1"
+            },
+            {
+              "code": "lock_chn1 2"
+            }
+          ],
+          "sub-type": "cam",
+          "monenable": 1,
+          "talkenable": 1,
+          "enable": 1
+        },
+        {
+          "id": 2,
+          "code": "CAM2",
+          "name": "Door2",
+          "type": "chn",
+          "children": [
+            {
+              "code": "lock_chn2 1"
+            },
+            {
+              "code": "lock_chn2 2"
+            }
+          ],
+          "sub-type": "cam",
+          "monenable": 1,
+          "talkenable": 1,
+          "enable": 1
+        },
+        {
+          "id": 3,
+          "code": "CAM3",
+          "name": "Door3",
+          "type": "chn",
+          "children": [
+            {
+              "code": "lock_chn3 1"
+            },
+            {
+              "code": "lock_chn3 2"
+            }
+          ],
+          "sub-type": "cam",
+          "monenable": 0,
+          "talkenable": 1,
+          "enable": 0
+        },
+        {
+          "id": 4,
+          "code": "CAM4",
+          "name": "Door4",
+          "type": "chn",
+          "children": [
+            {
+              "code": "lock_chn4 1"
+            },
+            {
+              "code": "lock_chn4 2"
+            }
+          ],
+          "sub-type": "cam",
+          "monenable": 0,
+          "talkenable": 1,
+          "enable": 0
+        },
+        {
+          "id": 9,
+          "code": "CAM5",
+          "name": "General Panel1",
+          "type": "chn",
+          "children": [
+            {
+              "code": "lock_chn9 1"
+            },
+            {
+              "code": "lock_chn9 2"
+            }
+          ],
+          "sub-type": "cam",
+          "monenable": 1,
+          "talkenable": 1,
+          "enable": 1
+        },
+        {
+          "id": 10,
+          "code": "CAM6",
+          "name": "General Panel2",
+          "type": "chn",
+          "children": [
+            {
+              "code": "lock_chn10 1"
+            },
+            {
+              "code": "lock_chn10 2"
+            }
+          ],
+          "sub-type": "cam",
+          "monenable": 1,
+          "talkenable": 1,
+          "enable": 1
+        },
+        {
+          "id": 11,
+          "code": "CAM7",
+          "name": "General Panel3",
+          "type": "chn",
+          "children": [
+            {
+              "code": "lock_chn11 1"
+            },
+            {
+              "code": "lock_chn11 2"
+            }
+          ],
+          "sub-type": "cam",
+          "monenable": 1,
+          "talkenable": 1,
+          "enable": 1
+        },
+        {
+          "id": 12,
+          "code": "CAM8",
+          "name": "General Panel4",
+          "type": "chn",
+          "children": [
+            {
+              "code": "lock_chn12 1"
+            },
+            {
+              "code": "lock_chn12 2"
+            }
+          ],
+          "sub-type": "cam",
+          "monenable": 0,
+          "talkenable": 1,
+          "enable": 0
+        },
+        {
+          "id": 5,
+          "code": "CCTV1",
+          "name": "CCTV1",
+          "type": "chn",
+          "children": [
+            {
+              "code": "lock_chn5 1"
+            },
+            {
+              "code": "lock_chn5 2"
+            }
+          ],
+          "cctv-src": 1,
+          "sub-type": "cctv",
+          "monenable": 0,
+          "talkenable": 1,
+          "enable": 0
+        },
+        {
+          "id": 6,
+          "code": "CCTV2",
+          "name": "CCTV2",
+          "type": "chn",
+          "children": [
+            {
+              "code": "lock_chn6 1"
+            },
+            {
+              "code": "lock_chn6 2"
+            }
+          ],
+          "cctv-src": 1,
+          "sub-type": "cctv",
+          "monenable": 0,
+          "talkenable": 1,
+          "enable": 0
+        },
+        {
+          "id": 7,
+          "code": "CCTV3",
+          "name": "CCTV3",
+          "type": "chn",
+          "children": [
+            {
+              "code": "lock_chn7 1"
+            },
+            {
+              "code": "lock_chn7 2"
+            }
+          ],
+          "cctv-src": 1,
+          "sub-type": "cctv",
+          "monenable": 0,
+          "talkenable": 1,
+          "enable": 0
+        },
+        {
+          "id": 8,
+          "code": "CCTV4",
+          "name": "CCTV4",
+          "type": "chn",
+          "children": [
+            {
+              "code": "lock_chn8 1"
+            },
+            {
+              "code": "lock_chn8 2"
+            }
+          ],
+          "cctv-src": 1,
+          "sub-type": "cctv",
+          "monenable": 0,
+          "talkenable": 1,
+          "enable": 0
+        },
+        {
+          "id": 13,
+          "code": "CCTV5",
+          "name": "General CCTV1",
+          "type": "chn",
+          "children": [
+            {
+              "code": "lock_chn13 1"
+            },
+            {
+              "code": "lock_chn13 2"
+            }
+          ],
+          "cctv-src": 1,
+          "sub-type": "cctv",
+          "monenable": 1,
+          "talkenable": 1,
+          "enable": 1
+        },
+        {
+          "id": 14,
+          "code": "CCTV6",
+          "name": "General CCTV2",
+          "type": "chn",
+          "children": [
+            {
+              "code": "lock_chn14 1"
+            },
+            {
+              "code": "lock_chn14 2"
+            }
+          ],
+          "cctv-src": 1,
+          "sub-type": "cctv",
+          "monenable": 1,
+          "talkenable": 1,
+          "enable": 1
+        },
+        {
+          "id": 15,
+          "code": "CCTV7",
+          "name": "General CCTV3",
+          "type": "chn",
+          "children": [
+            {
+              "code": "lock_chn15 1"
+            },
+            {
+              "code": "lock_chn15 2"
+            }
+          ],
+          "cctv-src": 1,
+          "sub-type": "cctv",
+          "monenable": 0,
+          "talkenable": 1,
+          "enable": 0
+        },
+        {
+          "id": 16,
+          "code": "CCTV8",
+          "name": "General CCTV4",
+          "type": "chn",
+          "children": [
+            {
+              "code": "lock_chn16 1"
+            },
+            {
+              "code": "lock_chn16 2"
+            }
+          ],
+          "cctv-src": 1,
+          "sub-type": "cctv",
+          "monenable": 0,
+          "talkenable": 1,
+          "enable": 0
+        },
+        {
+          "code": "lock_chn1 1",
+          "type": "lock",
+          "name": "lock_chn1 1",
+          "enable": 1,
+          "id": 1
+        },
+        {
+          "code": "lock_chn1 2",
+          "type": "lock",
+          "name": "lock_chn1 2",
+          "enable": 1,
+          "id": 2
+        },
+        {
+          "code": "lock_chn2 1",
+          "type": "lock",
+          "name": "lock_chn2 1",
+          "enable": 1,
+          "id": 1
+        },
+        {
+          "code": "lock_chn2 2",
+          "type": "lock",
+          "name": "lock_chn2 2",
+          "enable": 1,
+          "id": 2
+        },
+        {
+          "code": "lock_chn3 1",
+          "type": "lock",
+          "name": "lock_chn3 1",
+          "enable": 1,
+          "id": 1
+        },
+        {
+          "code": "lock_chn3 2",
+          "type": "lock",
+          "name": "lock_chn3 2",
+          "enable": 1,
+          "id": 2
+        },
+        {
+          "code": "lock_chn4 1",
+          "type": "lock",
+          "name": "lock_chn4 1",
+          "enable": 1,
+          "id": 1
+        },
+        {
+          "code": "lock_chn4 2",
+          "type": "lock",
+          "name": "lock_chn4 2",
+          "enable": 1,
+          "id": 2
+        },
+        {
+          "code": "lock_chn9 1",
+          "type": "lock",
+          "name": "lock_chn9 1",
+          "enable": 1,
+          "id": 1
+        },
+        {
+          "code": "lock_chn9 2",
+          "type": "lock",
+          "name": "lock_chn9 2",
+          "enable": 1,
+          "id": 2
+        },
+        {
+          "code": "lock_chn10 1",
+          "type": "lock",
+          "name": "lock_chn10 1",
+          "enable": 1,
+          "id": 1
+        },
+        {
+          "code": "lock_chn10 2",
+          "type": "lock",
+          "name": "lock_chn10 2",
+          "enable": 1,
+          "id": 2
+        },
+        {
+          "code": "lock_chn11 1",
+          "type": "lock",
+          "name": "lock_chn11 1",
+          "enable": 1,
+          "id": 1
+        },
+        {
+          "code": "lock_chn11 2",
+          "type": "lock",
+          "name": "lock_chn11 2",
+          "enable": 1,
+          "id": 2
+        },
+        {
+          "code": "lock_chn12 1",
+          "type": "lock",
+          "name": "lock_chn12 1",
+          "enable": 1,
+          "id": 1
+        },
+        {
+          "code": "lock_chn12 2",
+          "type": "lock",
+          "name": "lock_chn12 2",
+          "enable": 1,
+          "id": 2
+        },
+        {
+          "code": "lock_chn5 1",
+          "type": "lock",
+          "name": "lock_chn5 1",
+          "enable": 1,
+          "id": 1
+        },
+        {
+          "code": "lock_chn5 2",
+          "type": "lock",
+          "name": "lock_chn5 2",
+          "enable": 1,
+          "id": 2
+        },
+        {
+          "code": "lock_chn6 1",
+          "type": "lock",
+          "name": "lock_chn6 1",
+          "enable": 1,
+          "id": 1
+        },
+        {
+          "code": "lock_chn6 2",
+          "type": "lock",
+          "name": "lock_chn6 2",
+          "enable": 1,
+          "id": 2
+        },
+        {
+          "code": "lock_chn7 1",
+          "type": "lock",
+          "name": "lock_chn7 1",
+          "enable": 1,
+          "id": 1
+        },
+        {
+          "code": "lock_chn7 2",
+          "type": "lock",
+          "name": "lock_chn7 2",
+          "enable": 1,
+          "id": 2
+        },
+        {
+          "code": "lock_chn8 1",
+          "type": "lock",
+          "name": "lock_chn8 1",
+          "enable": 1,
+          "id": 1
+        },
+        {
+          "code": "lock_chn8 2",
+          "type": "lock",
+          "name": "lock_chn8 2",
+          "enable": 1,
+          "id": 2
+        },
+        {
+          "code": "lock_chn13 1",
+          "type": "lock",
+          "name": "lock_chn13 1",
+          "enable": 1,
+          "id": 1
+        },
+        {
+          "code": "lock_chn13 2",
+          "type": "lock",
+          "name": "lock_chn13 2",
+          "enable": 1,
+          "id": 2
+        },
+        {
+          "code": "lock_chn14 1",
+          "type": "lock",
+          "name": "lock_chn14 1",
+          "enable": 1,
+          "id": 1
+        },
+        {
+          "code": "lock_chn14 2",
+          "type": "lock",
+          "name": "lock_chn14 2",
+          "enable": 1,
+          "id": 2
+        },
+        {
+          "code": "lock_chn15 1",
+          "type": "lock",
+          "name": "lock_chn15 1",
+          "enable": 1,
+          "id": 1
+        },
+        {
+          "code": "lock_chn15 2",
+          "type": "lock",
+          "name": "lock_chn15 2",
+          "enable": 1,
+          "id": 2
+        },
+        {
+          "code": "lock_chn16 1",
+          "type": "lock",
+          "name": "lock_chn16 1",
+          "enable": 1,
+          "id": 1
+        },
+        {
+          "code": "lock_chn16 2",
+          "type": "lock",
+          "name": "lock_chn16 2",
+          "enable": 1,
+          "id": 2
+        },
+        {
+          "code": "COMLIGHT",
+          "type": "light",
+          "sub-type": "publiclight",
+          "name": "Stairlight",
+          "enable": 1,
+          "id": 1
+        }
+      ]
+    },
+    "error": 0
+  }
+}
