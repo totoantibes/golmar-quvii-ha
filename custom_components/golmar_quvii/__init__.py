@@ -26,10 +26,12 @@ from .const import (
     CONF_OEM_ID,
     CONF_PASSWORD,
     CONF_REGION,
+    CONF_SERVER_HOST,
     CONF_UNLOCK_MODE,
     DEFAULT_APP_ID,
     DEFAULT_OEM_ID,
     DEFAULT_REGION,
+    DEFAULT_SERVER_HOST,
     DEFAULT_UNLOCK_MODE,
     DOMAIN,
     MODE_AUTO,
@@ -81,7 +83,10 @@ class GolmarQuviiCoordinator(DataUpdateCoordinator):
         region = entry.data.get(CONF_REGION, DEFAULT_REGION)
         app_id = entry.data.get(CONF_APP_ID, DEFAULT_APP_ID)
         oem_id = entry.data.get(CONF_OEM_ID, DEFAULT_OEM_ID)
-        self.cloud = QuviiCloud(account, password, region, app_id, oem_id)
+        server_host = entry.data.get(CONF_SERVER_HOST, DEFAULT_SERVER_HOST)
+        self.cloud = QuviiCloud(
+            account, password, region, app_id, oem_id, server_host=server_host
+        )
         self.cloud_control = QuviiCloudControl(account, password, region, app_id, oem_id)
         self.endpoints: dict[str, dict] = {}          # umid -> {"ip", "port"}
         self.devices: dict[str, QuviiLocalDevice] = {}  # umid -> local client

@@ -3,20 +3,35 @@
     "step": {
       "user": {
         "title": "Compte Golmar / Quvii",
-        "description": "Connectez-vous avec votre compte Golmar G2Call+ (ou une autre application d'interphone basée sur Quvii). Vos identifiants servent à récupérer la clé locale de chaque platine ; l'ouverture des portes se fait ensuite en local, sauf si vous choisissez autrement ci-dessous. Laissez App ID / OEM ID tels quels pour Golmar.",
+        "description": "Connectez-vous avec votre compte Golmar G2Call+ ou Vimar View Door (ou une autre application d'interphone basée sur Quvii). Vos identifiants servent à récupérer la clé locale de chaque platine ; l'ouverture des portes se fait ensuite en local, sauf si vous choisissez autrement ci-dessous. Choisissez votre marque ; les champs avancés ci-dessous ne servent que pour une marque personnalisée.",
         "data": {
+          "brand": "Marque / appli (Golmar G2Call+, Vimar View Door ou personnalisée)",
           "account": "Compte (e-mail ou téléphone, ex. +33...)",
           "password": "Mot de passe",
           "region": "Identifiant de région (avancé — détecté automatiquement)",
-          "app_id": "App ID (avancé — Golmar = 4053)",
-          "oem_id": "OEM ID (avancé — Golmar = G0053,A0053)",
+          "app_id": "App ID (avancé — utilisé seulement si la marque est personnalisée)",
+          "oem_id": "OEM ID (avancé — utilisé seulement si la marque est personnalisée)",
+          "server_host": "Serveur de compte (avancé — utilisé seulement si la marque est personnalisée)",
           "unlock_mode": "Mode d'ouverture : local / auto / cloud",
           "extra_hosts": "Adresses de platines supplémentaires (facultatif, séparées par des virgules)"
         },
         "data_description": {
+          "brand": "golmar = Golmar G2Call+. vimar = Vimar View Door (ex. K42955). custom = une autre appli basée sur Quvii : renseignez App ID, OEM ID et, si la marque a son propre serveur, Serveur de compte.",
+          "account": "Pour Vimar, laissez compte et mot de passe vides : l'étape suivante les obtient depuis la page de connexion Vimar.",
           "unlock_mode": "local = réseau local uniquement, le plus rapide et fonctionne sans Internet. cloud = envoie la commande d'ouverture via les serveurs Quvii ; nécessaire pour les platines dont le micrologiciel n'ouvre l'interface locale que pendant la diffusion vidéo de l'application. auto = essaie d'abord en local, puis bascule sur le cloud.",
           "extra_hosts": "Utile uniquement si une platine n'est pas sur le même sous-réseau que Home Assistant — par exemple sur un VLAN séparé. La détection balaie automatiquement le sous-réseau local.",
-          "region": "Laissez ce champ tel quel. La connexion recherche le serveur régional qui héberge réellement votre compte et le mémorise ; cette valeur ne sert que de point de départ à cette recherche."
+          "region": "Laissez ce champ tel quel. La connexion recherche le serveur régional qui héberge réellement votre compte et le mémorise ; cette valeur ne sert que de point de départ à cette recherche.",
+          "server_host": "Laissez vide pour chercher parmi les serveurs régionaux Quvii. À remplir seulement pour une marque personnalisée ayant son propre serveur de compte, ex. marque.qvcloud.net."
+        }
+      },
+      "vimar_sso": {
+        "title": "Connexion Vimar View Door",
+        "description": "Les comptes Vimar se connectent via la page de Vimar : votre e-mail et mot de passe vimar.com ne sont pas ce qu'accepte le cloud de l'interphone.\n\n1. Ouvrez [cette page de connexion]({url}) dans un navigateur et connectez-vous avec votre compte View Door / vimar.com.\n2. Elle se termine sur une page affichant un court texte contenant \"result\":0, \"account\" et \"password\".\n3. Copiez-le en entier et collez-le ci-dessous.",
+        "data": {
+          "sso_json": "Texte affiché après la connexion"
+        },
+        "data_description": {
+          "sso_json": "Collez le texte complet, accolades comprises. Seuls le compte et le mot de passe qu'il contient sont enregistrés."
         }
       },
       "select": {
@@ -31,7 +46,9 @@
       "invalid_auth": "Compte ou mot de passe invalide.",
       "cannot_connect": "Impossible de joindre le cloud Quvii.",
       "no_devices": "Connexion réussie, mais aucun appareil trouvé sur ce compte.",
-      "login_refused": "Aucun serveur régional Quvii n'a reconnu ce compte, et le refus ne concerne ni le compte ni le mot de passe. Le code renvoyé par le serveur figure dans le journal de Home Assistant : merci de le signaler sur GitHub, car cela signifie que votre compte est hébergé sur un serveur inconnu de cette intégration."
+      "login_refused": "Aucun serveur régional Quvii n'a reconnu ce compte, et le refus ne concerne ni le compte ni le mot de passe. Le code renvoyé par le serveur figure dans le journal de Home Assistant : merci de le signaler sur GitHub, car cela signifie que votre compte est hébergé sur un serveur inconnu de cette intégration.",
+      "invalid_sso_json": "Ce n'est pas le texte de la page de connexion Vimar. Collez tout ce qu'elle affiche, du premier au dernier caractère. Si elle affiche une erreur, rouvrez le lien et reconnectez-vous.",
+      "missing_credentials": "Saisissez le compte et le mot de passe."
     },
     "abort": {
       "already_configured": "Ce compte est déjà configuré."

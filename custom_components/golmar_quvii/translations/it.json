@@ -1,0 +1,74 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Account Golmar / Quvii",
+        "description": "Accedi con il tuo account Golmar G2Call+ o Vimar View Door (o di un'altra app per videocitofoni basata su Quvii). Le credenziali servono a scaricare la chiave locale di ogni pannello; poi l'apertura delle porte avviene in locale, salvo che tu scelga diversamente qui sotto. Scegli la tua marca; i campi avanzati servono solo per una marca personalizzata.",
+        "data": {
+          "brand": "Marca / app (Golmar G2Call+, Vimar View Door o personalizzata)",
+          "account": "Account (email o telefono, es. +39...)",
+          "password": "Password",
+          "region": "Id regione (avanzato — rilevato automaticamente)",
+          "app_id": "App ID (avanzato — usato solo con marca personalizzata)",
+          "oem_id": "OEM ID (avanzato — usato solo con marca personalizzata)",
+          "server_host": "Server account (avanzato — usato solo con marca personalizzata)",
+          "unlock_mode": "Come aprire le porte: local / auto / cloud",
+          "extra_hosts": "Indirizzi aggiuntivi dei pannelli (facoltativo, separati da virgola)"
+        },
+        "data_description": {
+          "brand": "golmar = Golmar G2Call+. vimar = Vimar View Door (es. K42955). custom = un'altra app basata su Quvii: compila App ID, OEM ID e, se la marca ha un server proprio, Server account.",
+          "account": "Per Vimar lascia vuoti account e password: il passo successivo li ottiene dalla pagina di accesso Vimar.",
+          "unlock_mode": "local = solo LAN, il più veloce e funziona senza internet. cloud = invia il comando di apertura tramite i server Quvii; serve ai pannelli il cui firmware apre l'interfaccia locale solo mentre l'app trasmette video. auto = prova in locale, poi ripiega sul cloud.",
+          "extra_hosts": "Serve solo se un pannello non è nella stessa sottorete di Home Assistant — per esempio su una VLAN separata. La ricerca scansiona automaticamente la sottorete locale.",
+          "region": "Lascialo così. L'accesso trova da solo il server regionale che ospita il tuo account e lo ricorda; questo valore è solo il punto di partenza della ricerca.",
+          "server_host": "Lascia vuoto per cercare tra i server regionali Quvii. Compilalo solo per una marca personalizzata con un proprio server account, es. marca.qvcloud.net."
+        }
+      },
+      "vimar_sso": {
+        "title": "Accesso Vimar View Door",
+        "description": "Gli account Vimar accedono tramite la pagina di Vimar, quindi email e password di vimar.com non sono quelle che accetta il cloud del videocitofono.\n\n1. Apri [questa pagina di accesso]({url}) in un browser ed entra con il tuo account View Door / vimar.com.\n2. Alla fine compare una pagina con un breve testo che contiene \"result\":0, \"account\" e \"password\".\n3. Copialo tutto e incollalo qui sotto.",
+        "data": {
+          "sso_json": "Testo mostrato dopo l'accesso"
+        },
+        "data_description": {
+          "sso_json": "Incolla il testo completo, parentesi graffe comprese. Vengono salvati solo account e password che contiene."
+        }
+      },
+      "select": {
+        "title": "Scegli le porte da controllare",
+        "description": "Spunta i pannelli e le serrature che usi davvero — le stesse che apri dall'app ufficiale. Gli ingressi di palazzina compaiono come \"Door N\" e quelli su strada come \"General Panel N\", ciascuno con due relè serratura. Aprono solo i canali collegati fisicamente al tuo pannello; gli altri vengono accettati ma non fanno nulla. Puoi cambiarlo in seguito dalle opzioni dell'integrazione.",
+        "data": {
+          "locks": "Porte / serrature"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Account o password non validi.",
+      "cannot_connect": "Impossibile raggiungere il cloud Quvii.",
+      "no_devices": "Accesso riuscito, ma nessun dispositivo trovato su questo account.",
+      "login_refused": "Nessun server regionale Quvii ha riconosciuto questo account, e il rifiuto non riguardava account o password. Il codice del server è nel log di Home Assistant — segnalalo su GitHub, perché significa che il tuo account è ospitato in un posto che questa integrazione non conosce.",
+      "invalid_sso_json": "Questo non è il testo della pagina di accesso Vimar. Incolla tutto quello che mostra, dal primo all'ultimo carattere. Se mostra un errore, riapri il link e accedi di nuovo.",
+      "missing_credentials": "Inserisci account e password."
+    },
+    "abort": {
+      "already_configured": "Questo account è già configurato."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Porte da controllare",
+        "description": "Aggiorna quali pannelli e serrature compaiono come pulsanti — come quelli che apri dall'app ufficiale. Aprono solo i canali collegati al tuo pannello; togli la spunta agli altri.",
+        "data": {
+          "locks": "Porte / serrature",
+          "unlock_mode": "Come aprire le porte: local / auto / cloud",
+          "extra_hosts": "Indirizzi aggiuntivi dei pannelli (facoltativo, separati da virgola)"
+        },
+        "data_description": {
+          "unlock_mode": "local = solo LAN, il più veloce e funziona senza internet. cloud = invia il comando di apertura tramite i server Quvii; serve ai pannelli il cui firmware apre l'interfaccia locale solo mentre l'app trasmette video. auto = prova in locale, poi ripiega sul cloud.",
+          "extra_hosts": "Serve solo se un pannello non è nella stessa sottorete di Home Assistant — per esempio su una VLAN separata."
+        }
+      }
+    }
+  }
+}

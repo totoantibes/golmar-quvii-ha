@@ -79,18 +79,25 @@ class DeadHost:
 class FakeSession:
     """Answers by host. Any host not listed simply does not exist."""
 
-    def __init__(self, hosts, aiohttp_mod):
+    def __init__(self, hosts, aiohttp_mod, private_cert=()):
         self.hosts = hosts
         self.tried = []
+        self.ssl_used = []
         self._aiohttp = aiohttp_mod
+        # hosts whose certificate only passes when pinned, like vimar.qvcloud.net
+        self.private_cert = set(private_cert)
 
-    def post(self, url, data=None, headers=None, **kw):
+    def post(self, url, data=None, headers=None, ssl=True, **kw):
         host = url.split("//")[1].split("/")[0]
         self.tried.append(host)
+        self.ssl_used.append(ssl)
+        key = self._aiohttp.client_reqrep.ConnectionKey(
+            host, 443, False, True, None, None, None)
         if host not in self.hosts:
-            key = self._aiohttp.client_reqrep.ConnectionKey(
-                host, 443, False, True, None, None, None)
             return DeadHost(self._aiohttp.ClientConnectorError(key, OSError("no host")))
+        if host in self.private_cert and not isinstance(ssl, self._aiohttp.Fingerprint):
+            return DeadHost(self._aiohttp.ClientConnectorCertificateError(
+                key, Exception("unable to get local issuer certificate")))
         return FakeResponse(self.hosts[host])
 
 
@@ -192,6 +199,81 @@ async def main():
     s.hosts["r3-1-sec.qvcloud.net"] = success("B")
     check("recovers onto the new server", await c._async_login(s), "B")
     check("and records it", c.resolved_region, "3")
+
+    print("\n== a brand with its own server (Vimar) ==")
+    VIMAR = "vimar.qvcloud.net"
+    s = FakeSession({VIMAR: success("VIMAR")}, aiohttp, private_cert={VIMAR})
+    c = cloud.QuviiCloud("acct", "pw", server_host=VIMAR)
+    check("signs in on the brand server", await c._async_login(s), "VIMAR")
+    check("never touches the regional pool",
+          [h for h in s.tried if h != VIMAR], [])
+    check("verified first, then pinned",
+          [type(x).__name__ for x in s.ssl_used], ["bool", "Fingerprint"])
+    check("pin is the Qualvision certificate",
+          s.ssl_used[-1].fingerprint.hex(), const.QVCLOUD_CERT_SHA256)
+
+    s = FakeSession({VIMAR: success()}, aiohttp)
+    c = cloud.QuviiCloud("acct", "pw", server_host=f"https://{VIMAR}/")
+    await c._async_login(s)
+    check("scheme and trailing slash are accepted", s.tried, [VIMAR])
+    check("a public certificate is never pinned", s.ssl_used, [True])
+
+    print("\n== brand server: wrong account is still an auth error ==")
+    # what the Golmar pool says about a View Door account, and vice versa
+    s = FakeSession({VIMAR: refusal(BAD)}, aiohttp, private_cert={VIMAR})
+    c = cloud.QuviiCloud("acct", "pw", server_host=VIMAR)
+    try:
+        await c._async_login(s)
+        check("raises on bad credentials", "no error", "QuviiAuthError")
+    except cloud.QuviiAuthError:
+        check("raises on bad credentials", True, True)
+
+    print("\n== brand server: wrong region moves the body, not the host ==")
+    s = FakeSession({VIMAR: refusal(WRONG)}, aiohttp)
+    c = cloud.QuviiCloud("acct", "pw", server_host=VIMAR)
+    try:
+        await c._async_login(s)
+    except cloud.QuviiLoginRefused:
+        pass
+    check("one attempt per region, all on the brand server",
+          s.tried, [VIMAR] * len(const.REGION_CANDIDATES))
+
+    print("\n== password hashing follows the SDK ==")
+    plain = cloud.QuviiCloud("acct", "pw")._pw
+    check("a typed password is sha256-hashed",
+          plain, "30c952fab122c3f9759f02a6d95c3758b246b4fee239957b2d4fee46e26170c4")
+    issued = "ab" * 32
+    check("a 64-char SSO password goes through untouched",
+          cloud.QuviiCloud("acct", issued)._pw, issued)
+    check("pasted with a trailing newline it is still not re-hashed",
+          cloud.QuviiCloud("acct", f" {issued}\n")._pw, issued)
+
+    print("\n== Vimar SSO callback ==")
+    parse = cloud.parse_sso_credentials
+    page = '{"result":0,"account":"vimar_abc","password":"' + issued + '"}'
+    check("callback JSON gives account and password",
+          parse(page), ("vimar_abc", issued))
+    check("whitespace from copy/paste is ignored",
+          parse(f"\n  {page}  \n"), ("vimar_abc", issued))
+    check("result as a string is accepted", parse(page.replace(":0", ':"0"')),
+          ("vimar_abc", issued))
+    check("a refused callback is rejected",
+          parse('{"result":-1,"account":"","password":""}'), None)
+    check("half-copied JSON is rejected", parse(page[:-5]), None)
+    check("plain text is rejected", parse("me@example.com"), None)
+    check("missing password is rejected", parse('{"result":0,"account":"a"}'), None)
+    check("vimar.com password is not mistaken for an issued one",
+          cloud.is_issued_password("hunter2"), False)
+    check("issued password is recognised", cloud.is_issued_password(issued), True)
+
+    print("\n== brand presets ==")
+    check("vimar preset", const.BRANDS[const.BRAND_VIMAR], {
+        const.CONF_APP_ID: "2078", const.CONF_OEM_ID: "G0078",
+        const.CONF_SERVER_HOST: VIMAR})
+    check("golmar preset keeps the old defaults", const.BRANDS[const.BRAND_GOLMAR], {
+        const.CONF_APP_ID: const.DEFAULT_APP_ID,
+        const.CONF_OEM_ID: const.DEFAULT_OEM_ID,
+        const.CONF_SERVER_HOST: ""})
 
     print("\n== refusal classification ==")
     check("wrong-region is not an auth error",

@@ -8,6 +8,16 @@ CONF_PASSWORD = "password"
 CONF_REGION = "region"
 CONF_APP_ID = "app_id"
 CONF_OEM_ID = "oem_id"
+# Fixed account server for brands that do not use the r<region>-<lb>-sec pool.
+# Empty -> search the regional pool as usual.
+CONF_SERVER_HOST = "server_host"
+# Brand preset picked in the config flow (see BRANDS). Only steers the flow: the
+# values it implies are stored in their own keys, so entries made before presets
+# existed keep working unchanged.
+CONF_BRAND = "brand"
+# Vimar SSO step: the callback JSON pasted by the user. Never stored; only the
+# account and password parsed out of it are.
+CONF_SSO_JSON = "sso_json"
 # entry OPTIONS: the door/lock buttons the user chose to create, as a list of
 # {"umid", "door", "lock", "name"} dicts. Set by the config-flow selection step
 # and editable afterwards via the options flow. Empty/absent -> DEFAULT_LOCKS.
@@ -37,7 +47,42 @@ DEFAULT_UNLOCK_MODE = MODE_LOCAL
 DEFAULT_APP_ID = "4053"
 DEFAULT_OEM_ID = "G0053,A0053"
 DEFAULT_REGION = "1"
+DEFAULT_SERVER_HOST = ""
 DEFAULT_LB = "8"          # cloud load-balancer instance (r<region>-<lb>-sec.qvcloud.net)
+
+# Known Quvii brands. "custom" leaves App ID / OEM ID / server to the user.
+#
+# Vimar (View Door app, e.g. K42955) has its own account server instead of the
+# regional pool: an account made in View Door does not exist on the Golmar
+# servers, so signing in there fails with LOGIN_BAD_CREDENTIALS even though the
+# password is right. Values extracted from the View Door APK (v2.2.11).
+BRAND_GOLMAR = "golmar"
+BRAND_VIMAR = "vimar"
+BRAND_CUSTOM = "custom"
+BRANDS = {
+    BRAND_GOLMAR: {
+        CONF_APP_ID: DEFAULT_APP_ID,
+        CONF_OEM_ID: DEFAULT_OEM_ID,
+        CONF_SERVER_HOST: DEFAULT_SERVER_HOST,
+    },
+    BRAND_VIMAR: {
+        CONF_APP_ID: "2078",
+        CONF_OEM_ID: "G0078",
+        CONF_SERVER_HOST: "vimar.qvcloud.net",
+    },
+}
+BRAND_OPTIONS = [BRAND_GOLMAR, BRAND_VIMAR, BRAND_CUSTOM]
+DEFAULT_BRAND = BRAND_GOLMAR
+
+# Brand servers such as vimar.qvcloud.net present Qualvision's own certificate:
+# a private CA, no subjectAltName, valid 2017-12-11 to 2037-12-06. Normal
+# verification can never pass, so when it fails the connection is retried
+# pinned to this exact certificate (SHA-256 of the DER) instead of being
+# accepted unverified. The regional r<region>-<lb>-sec hosts have public
+# certificates and never reach the pin.
+QVCLOUD_CERT_SHA256 = (
+    "e7167be07fc554614ce611b1be054c29cfc39926695d6a6717c9e631dc83276a"
+)
 
 # Account servers are r<region>-<lb>-sec.qvcloud.net, and **which lb values exist
 # depends on the region**: lb 8 serves regions 1, 5, 6 and 7 but does not exist at
@@ -65,6 +110,15 @@ CLIENT_TYPE = "3"
 # Identifies this integration to the cloud. Deliberately not the phone app's own
 # client id: sharing one would put both on the same session.
 CLIENT_SUFFIX = "haquviilocal01"
+
+# Vimar accounts sign in through Vimar's SSO, not with a Quvii password. This
+# page bounces through oauth.vimar.com and ends on sso.qvcloud.net/vimar/callback,
+# which shows {"result":0,"account":...,"password":...}: the Quvii credentials the
+# cloud actually accepts. The password is a ready-made 64-hex value.
+VIMAR_SSO_URL = (
+    "https://sso.qvcloud.net/vimar/usrpwd/authorize"
+    f"?oem=G0078&client_id=003-2078-{CLIENT_SUFFIX}&rgn=1"
+)
 
 # Cloud control plane (only used by MODE_CLOUD / MODE_AUTO). Both hosts are
 # region scoped in the same "r<region>" style as the account plane. Only region 1

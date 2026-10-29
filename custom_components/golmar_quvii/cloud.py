@@ -27,6 +27,7 @@ from .const import (
     DEFAULT_APP_ID,
     DEFAULT_OEM_ID,
     DEFAULT_REGION,
+    DEFAULT_SERVER_HOST,
     LB_CANDIDATES,
     LOGIN_BAD_CREDENTIALS,
     LOGIN_WRONG_REGION,
@@ -34,6 +35,7 @@ from .const import (
     OAUTH_PATH,
     OPENAPI_CONTROL_PATH,
     OPENAPI_HOST_TEMPLATE,
+    QVCLOUD_CERT_SHA256,
     REGION_CANDIDATES,
     TOKEN_DEFAULT_TTL,
     TOKEN_EXPIRY_MARGIN,
@@ -75,6 +77,58 @@ def _host(region: str, lb: str) -> str:
     return f"https://r{region}-{lb}-sec.qvcloud.net"
 
 
+def _fixed_host(server_host: str) -> str:
+    """Base URL for a brand's own server, typed with or without a scheme."""
+    host = server_host.strip().rstrip("/")
+    return host if "://" in host else f"https://{host}"
+
+
+_QVCLOUD_PIN = aiohttp.Fingerprint(bytes.fromhex(QVCLOUD_CERT_SHA256))
+
+
+def is_issued_password(password: str) -> bool:
+    """True for a ready-made 64-hex password, as Vimar's SSO hands out."""
+    value = password.strip()
+    return len(value) == 64 and all(c in "0123456789abcdefABCDEF" for c in value)
+
+
+def parse_sso_credentials(text: str) -> tuple[str, str] | None:
+    """Pull account and password out of the Vimar SSO callback page.
+
+    Accepts the JSON exactly as the browser shows it. Anything else - a refused
+    callback, a half-copied object, plain text - returns None.
+    """
+    try:
+        doc = json.loads(text.strip())
+    except ValueError:
+        return None
+    if not isinstance(doc, dict) or str(doc.get("result")) != "0":
+        return None
+    account, password = doc.get("account"), doc.get("password")
+    if not isinstance(account, str) or not isinstance(password, str):
+        return None
+    if not account.strip() or not password.strip():
+        return None
+    return account.strip(), password.strip()
+
+
+def _password_hash(password: str) -> str:
+    """Hash a password the way the Quvii SDK does before sending it.
+
+    The SDK only hashes when the value is not already 64 characters long. That
+    matters for Vimar, whose SSO hands out a ready-made password that must go
+    over the wire untouched; hashing it again makes the server refuse it.
+
+    A 64-hex value pasted with a stray space or newline around it is still that
+    value: hashing it would turn a copy/paste slip into "invalid password".
+    """
+    if is_issued_password(password):
+        return password.strip()
+    if len(password) == 64:
+        return password
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
 class QuviiCloud:
     """Minimal Quvii cloud client (Golmar-ready, any Quvii OEM via app_id/oem_id)."""
 
@@ -86,14 +140,16 @@ class QuviiCloud:
         app_id: str = DEFAULT_APP_ID,
         oem_id: str = DEFAULT_OEM_ID,
         lb: str | None = None,
+        server_host: str = DEFAULT_SERVER_HOST,
     ) -> None:
-        self._account = account
-        self._pw = hashlib.sha256(password.encode()).hexdigest()
+        self._account = account.strip()
+        self._pw = _password_hash(password)
         self._region = region
         self._app_id = app_id
         self._oem_id = oem_id
         self._client_id = f"003-{app_id}-{CLIENT_SUFFIX}"
         self._lb = lb
+        self._server_host = server_host
         # Set once a login succeeds, and reused from then on so the search runs
         # at most once per session.
         self.resolved_region: str = region
@@ -103,6 +159,16 @@ class QuviiCloud:
         if not self._lb:
             return LB_CANDIDATES
         return (self._lb,) + tuple(x for x in LB_CANDIDATES if x != self._lb)
+
+    def _hosts(self, region: str) -> tuple[str, ...]:
+        """Base URLs that can serve an account in this region.
+
+        A brand with its own server has exactly one, whatever the region; the
+        region then only travels in the login body.
+        """
+        if self._server_host:
+            return (_fixed_host(self._server_host),)
+        return tuple(_host(region, lb) for lb in self._lb_candidates())
 
     def _region_candidates(self) -> tuple[str, ...]:
         """Configured region first, then the rest as fallbacks."""
@@ -124,9 +190,20 @@ class QuviiCloud:
 
     async def _post(self, session: aiohttp.ClientSession, body: str,
                     url: str | None = None) -> str:
+        url = url or self._url
+        try:
+            return await self._send(session, body, url)
+        except aiohttp.ClientConnectorCertificateError:
+            # Brand servers carry Qualvision's private certificate (see
+            # QVCLOUD_CERT_SHA256). Accept that one certificate and nothing else.
+            return await self._send(session, body, url, ssl=_QVCLOUD_PIN)
+
+    @staticmethod
+    async def _send(session: aiohttp.ClientSession, body: str, url: str,
+                    ssl: aiohttp.Fingerprint | bool = True) -> str:
         async with session.post(
-            url or self._url, data=body.encode(),
-            headers={"Content-Type": "application/xml"},
+            url, data=body.encode(),
+            headers={"Content-Type": "application/xml"}, ssl=ssl,
         ) as resp:
             return await resp.text()
 
@@ -160,12 +237,12 @@ class QuviiCloud:
 
         last_error: QuviiCloudError | None = None
         for region in self._region_candidates():
-            for lb in self._lb_candidates():
-                url = _host(region, lb) + "/auth/user?jus_duplex=up"
+            for base in self._hosts(region):
+                url = base + "/auth/user?jus_duplex=up"
                 try:
                     text = await self._post(session, self._login_body(region), url)
                 except (aiohttp.ClientError, TimeoutError):
-                    continue  # no such host, or unreachable - try the next lb
+                    continue  # no such host, or unreachable - try the next one
                 if sid := re.search(r"<session><id>([^<]+)</id>", text):
                     if region != self._region:
                         _LOGGER.warning(
@@ -323,8 +400,8 @@ class QuviiCloudControl:
         app_id: str = DEFAULT_APP_ID,
         oem_id: str = DEFAULT_OEM_ID,
     ) -> None:
-        self._account = account
-        self._pw = hashlib.sha256(password.encode()).hexdigest()
+        self._account = account.strip()
+        self._pw = _password_hash(password)
         self._region = region
         self._app_id = app_id
         self._oem_id = oem_id

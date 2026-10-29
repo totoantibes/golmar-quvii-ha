@@ -13,6 +13,7 @@ from homeassistant.config_entries import (
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.selector import TextSelector, TextSelectorConfig
 
 from .cloud import (
     QuviiAuthError,
@@ -20,25 +21,36 @@ from .cloud import (
     QuviiCloudControl,
     QuviiCloudError,
     QuviiLoginRefused,
+    is_issued_password,
+    parse_sso_credentials,
 )
 from .const import (
+    BRAND_OPTIONS,
+    BRAND_VIMAR,
+    BRANDS,
     CONF_ACCOUNT,
     CONF_APP_ID,
+    CONF_BRAND,
     CONF_EXTRA_HOSTS,
     CONF_LOCKS,
     CONF_OEM_ID,
     CONF_PASSWORD,
     CONF_REGION,
+    CONF_SERVER_HOST,
+    CONF_SSO_JSON,
     CONF_UNLOCK_MODE,
     DEFAULT_APP_ID,
+    DEFAULT_BRAND,
     DEFAULT_LOCKS,
     DEFAULT_OEM_ID,
     DEFAULT_REGION,
+    DEFAULT_SERVER_HOST,
     DEFAULT_UNLOCK_MODE,
     DOMAIN,
     MODE_AUTO,
     MODE_CLOUD,
     UNLOCK_MODES,
+    VIMAR_SSO_URL,
 )
 from .device import QuviiLocalDevice, async_discover_ips
 
@@ -152,6 +164,8 @@ class GolmarQuviiConfigFlow(ConfigFlow, domain=DOMAIN):
         self._data: dict[str, Any] = {}
         self._options: dict[str, Any] = {}
         self._catalog: dict[str, dict] = {}
+        # first-screen input held while the Vimar SSO step collects credentials
+        self._pending: dict[str, Any] = {}
 
     @staticmethod
     @callback
@@ -163,67 +177,36 @@ class GolmarQuviiConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
-            cloud = QuviiCloud(
-                user_input[CONF_ACCOUNT],
-                user_input[CONF_PASSWORD],
-                user_input.get(CONF_REGION, DEFAULT_REGION),
-                user_input.get(CONF_APP_ID, DEFAULT_APP_ID),
-                user_input.get(CONF_OEM_ID, DEFAULT_OEM_ID),
-            )
-            try:
-                devices = await cloud.async_get_devices()
-            except QuviiAuthError:
-                errors["base"] = "invalid_auth"
-            except QuviiLoginRefused:
-                # Refused, but not for the credentials - most often the account
-                # lives on a different regional server than the one asked.
-                errors["base"] = "login_refused"
-            except QuviiCloudError:
-                errors["base"] = "cannot_connect"
-            else:
-                if not devices:
-                    errors["base"] = "no_devices"
-                else:
-                    await self.async_set_unique_id(user_input[CONF_ACCOUNT])
-                    self._abort_if_unique_id_configured()
-                    self._data = {k: v for k, v in user_input.items() if k not in _OPTION_KEYS}
-                    # Sign-in locates the account's real regional server, which
-                    # may not be the one chosen. Store what worked so the search
-                    # is not repeated on every future refresh.
-                    self._data[CONF_REGION] = cloud.resolved_region
-                    mode = user_input.get(CONF_UNLOCK_MODE, DEFAULT_UNLOCK_MODE)
-                    self._options = {
-                        CONF_UNLOCK_MODE: mode,
-                        CONF_EXTRA_HOSTS: user_input.get(CONF_EXTRA_HOSTS, ""),
-                    }
-                    # Cloud modes can ask the panel about itself even with no
-                    # LAN route to it. Built on the region sign-in actually
-                    # landed on, not the one that was typed.
-                    control = None
-                    if mode in (MODE_CLOUD, MODE_AUTO):
-                        control = QuviiCloudControl(
-                            user_input[CONF_ACCOUNT],
-                            user_input[CONF_PASSWORD],
-                            cloud.resolved_region,
-                            user_input.get(CONF_APP_ID, DEFAULT_APP_ID),
-                            user_input.get(CONF_OEM_ID, DEFAULT_OEM_ID),
-                        )
-                    self._catalog = await _discover_catalog(
-                        self.hass, devices,
-                        _split_hosts(user_input.get(CONF_EXTRA_HOSTS)),
-                        skip_discovery=mode == MODE_CLOUD,
-                        cloud_control=control,
-                    )
-                    return await self.async_step_select()
+            # A named brand overrides the advanced fields; only "custom" reads
+            # them. The resolved values are what gets stored.
+            brand = user_input.get(CONF_BRAND, DEFAULT_BRAND)
+            user_input = {**user_input, **BRANDS.get(brand, {})}
+            if brand == BRAND_VIMAR and not is_issued_password(
+                user_input.get(CONF_PASSWORD, "")
+            ):
+                # A vimar.com email and password are never what the Quvii cloud
+                # accepts, so rather than fail with "invalid account" send the
+                # user through the SSO page that hands out the real credentials.
+                self._pending = user_input
+                return await self.async_step_vimar_sso()
+            if not user_input.get(CONF_ACCOUNT) or not user_input.get(CONF_PASSWORD):
+                errors["base"] = "missing_credentials"
+            elif result := await self._async_sign_in(user_input, errors):
+                return result
 
-        # Defaults = Golmar G2Call+. Other Quvii-SDK brands override app_id / oem_id.
+        # Defaults = Golmar G2Call+. Unlisted Quvii-SDK brands pick "custom" and
+        # fill in app_id / oem_id (and server_host if they have their own server).
+        # Account and password are optional only because Vimar gets them from
+        # the SSO step instead; every other brand is checked above.
         schema = vol.Schema(
             {
-                vol.Required(CONF_ACCOUNT): str,
-                vol.Required(CONF_PASSWORD): str,
+                vol.Optional(CONF_BRAND, default=DEFAULT_BRAND): vol.In(BRAND_OPTIONS),
+                vol.Optional(CONF_ACCOUNT, default=""): str,
+                vol.Optional(CONF_PASSWORD, default=""): str,
                 vol.Optional(CONF_REGION, default=DEFAULT_REGION): str,
                 vol.Optional(CONF_APP_ID, default=DEFAULT_APP_ID): str,
                 vol.Optional(CONF_OEM_ID, default=DEFAULT_OEM_ID): str,
+                vol.Optional(CONF_SERVER_HOST, default=DEFAULT_SERVER_HOST): str,
                 vol.Optional(CONF_UNLOCK_MODE, default=DEFAULT_UNLOCK_MODE): vol.In(
                     UNLOCK_MODES
                 ),
@@ -231,6 +214,98 @@ class GolmarQuviiConfigFlow(ConfigFlow, domain=DOMAIN):
             }
         )
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+
+    async def async_step_vimar_sso(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Take the credentials Vimar's SSO page shows after signing in."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            creds = parse_sso_credentials(user_input.get(CONF_SSO_JSON, ""))
+            if creds is None:
+                errors["base"] = "invalid_sso_json"
+            else:
+                account, password = creds
+                merged = {**self._pending, CONF_ACCOUNT: account, CONF_PASSWORD: password}
+                if result := await self._async_sign_in(merged, errors):
+                    return result
+        return self.async_show_form(
+            step_id="vimar_sso",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_SSO_JSON): TextSelector(
+                        TextSelectorConfig(multiline=True)
+                    )
+                }
+            ),
+            description_placeholders={"url": VIMAR_SSO_URL},
+            errors=errors,
+        )
+
+    async def _async_sign_in(
+        self, user_input: dict[str, Any], errors: dict[str, str]
+    ) -> ConfigFlowResult | None:
+        """Sign in, list the panels and move on to the lock selection.
+
+        Returns the next step, or None with `errors` filled in so the caller can
+        show its own form again.
+        """
+        cloud = QuviiCloud(
+            user_input[CONF_ACCOUNT],
+            user_input[CONF_PASSWORD],
+            user_input.get(CONF_REGION, DEFAULT_REGION),
+            user_input.get(CONF_APP_ID, DEFAULT_APP_ID),
+            user_input.get(CONF_OEM_ID, DEFAULT_OEM_ID),
+            server_host=user_input.get(CONF_SERVER_HOST, DEFAULT_SERVER_HOST),
+        )
+        try:
+            devices = await cloud.async_get_devices()
+        except QuviiAuthError:
+            errors["base"] = "invalid_auth"
+            return None
+        except QuviiLoginRefused:
+            # Refused, but not for the credentials - most often the account
+            # lives on a different regional server than the one asked.
+            errors["base"] = "login_refused"
+            return None
+        except QuviiCloudError:
+            errors["base"] = "cannot_connect"
+            return None
+        if not devices:
+            errors["base"] = "no_devices"
+            return None
+
+        await self.async_set_unique_id(user_input[CONF_ACCOUNT])
+        self._abort_if_unique_id_configured()
+        self._data = {k: v for k, v in user_input.items() if k not in _OPTION_KEYS}
+        # Sign-in locates the account's real regional server, which
+        # may not be the one chosen. Store what worked so the search
+        # is not repeated on every future refresh.
+        self._data[CONF_REGION] = cloud.resolved_region
+        mode = user_input.get(CONF_UNLOCK_MODE, DEFAULT_UNLOCK_MODE)
+        self._options = {
+            CONF_UNLOCK_MODE: mode,
+            CONF_EXTRA_HOSTS: user_input.get(CONF_EXTRA_HOSTS, ""),
+        }
+        # Cloud modes can ask the panel about itself even with no
+        # LAN route to it. Built on the region sign-in actually
+        # landed on, not the one that was typed.
+        control = None
+        if mode in (MODE_CLOUD, MODE_AUTO):
+            control = QuviiCloudControl(
+                user_input[CONF_ACCOUNT],
+                user_input[CONF_PASSWORD],
+                cloud.resolved_region,
+                user_input.get(CONF_APP_ID, DEFAULT_APP_ID),
+                user_input.get(CONF_OEM_ID, DEFAULT_OEM_ID),
+            )
+        self._catalog = await _discover_catalog(
+            self.hass, devices,
+            _split_hosts(user_input.get(CONF_EXTRA_HOSTS)),
+            skip_discovery=mode == MODE_CLOUD,
+            cloud_control=control,
+        )
+        return await self.async_step_select()
 
     async def async_step_select(
         self, user_input: dict[str, Any] | None = None
