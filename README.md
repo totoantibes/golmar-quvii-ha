@@ -10,9 +10,9 @@ is streaming video, which leaves nothing on the LAN to talk to. Those panels can
 opt into a **cloud unlock** path instead — see
 [How doors are opened](#how-doors-are-opened). Local remains the default.
 
-> **Tested with:** Golmar G2Call+ (`ART7W‑G2+`) and the Wi‑Fi
+> **Tested with:** Golmar G2Call+ (`ART7W‑G2+`), the Wi‑Fi
 > `ART 4W LITE/G2+` in `cloud` mode (reported by the integration as
-> `ART4HW/G2+`).
+> `ART4HW/G2+`), and Vimar View Door (`K42955`) in `local` mode.
 > Golmar is one of several brands built on the **Quvii** platform, so other
 > Quvii‑based intercom apps *may* work by setting the App ID / OEM ID in the
 > config flow — see [Other Quvii brands](#other-quvii-brands). Only Golmar is
@@ -118,8 +118,9 @@ In HACS, search for **“Golmar / Quvii Local”** and click **Download**.
 ### 3. Configure
 
 **Settings → Devices & Services → Add Integration → “Golmar / Quvii Local”** →
-enter your account (email or `+phone`) and password. Leave the advanced **App ID
-/ OEM ID** fields as‑is for Golmar, and leave **How to open doors** on `local`
+enter your account (email or `+phone`) and password, and pick your **Brand**
+(`golmar` or `vimar`; see [Other Quvii brands](#other-quvii-brands) for
+`custom`). Leave **How to open doors** on `local`
 unless your panel can't be reached on the LAN. **Extra panel addresses** is only
 needed for a panel outside Home Assistant's own subnet — a VLAN, say — and takes
 a comma‑separated list of addresses.
@@ -168,14 +169,31 @@ app shows it (e.g. `+34…`).
 
 Golmar is one brand built on the Quvii platform. Other Quvii‑based intercoms use
 the same integration but have their own **App ID** / **OEM ID**, and accounts are
-scoped to that brand's cloud — so set those two advanced fields in the config
-flow.
+scoped to that brand's cloud. Known brands are a **Brand** preset in the config
+flow; for any other, choose `custom` and fill in the advanced fields. Some brands
+also run their own **Account server** instead of the shared regional pool; leave
+that field empty unless yours does.
 
 ### Known brands
 
-| Brand  | App     | App ID | OEM ID        | Region | Verified |
-|--------|---------|--------|---------------|--------|----------|
-| Golmar | G2Call+ | `4053` | `G0053,A0053` | `1`    | ✅       |
+| Brand  | App            | App ID | OEM ID        | Account server      | Verified |
+|--------|----------------|--------|---------------|---------------------|----------|
+| Golmar | G2Call+        | `4053` | `G0053,A0053` | regional pool       | ✅       |
+| Vimar  | View Door      | `2078` | `G0078`       | `vimar.qvcloud.net` | ✅ `K42955`, `local` mode |
+
+**Vimar** (e.g. `K42955`, internal model `IDS9457AW`): View Door signs in through
+Vimar's own SSO, so your vimar.com email and password are **not** what the Quvii
+cloud accepts. Pick brand `vimar` and leave account and password empty; the next
+step links to Vimar's sign‑in page. After you log in there with your View Door /
+vimar.com account, the page shows a short JSON with `account` and `password`.
+Paste it whole into the form. Only those two values are stored. Typing the
+vimar.com credentials into the first screen leads to the same step instead of
+failing.
+
+The account server (`vimar.qvcloud.net`) presents
+the vendor's private certificate, which no public CA signs. The integration pins
+that exact certificate by its SHA‑256 fingerprint rather than turning verification
+off. `cloud` unlock mode is untested for Vimar, so use `local`.
 
 If you get another brand working, please open a PR to add a row so others can
 just pick it. (App ID / OEM ID are app‑specific values; region `1` = Europe.)
